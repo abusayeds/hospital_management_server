@@ -34,7 +34,13 @@ export const getToday = async (date = todayInDhaka()) => {
         // Minutes from check-in until the doctor called the patient
         wait: [
           { $match: { checkedInAt: { $ne: null }, consultationStartedAt: { $ne: null } } },
-          { $group: { _id: null, avg: { $avg: { $divide: [{ $subtract: ["$consultationStartedAt", "$checkedInAt"] }, 60000] } }, n: { $sum: 1 } } },
+          {
+            $group: {
+              _id: null,
+              avg: { $avg: { $divide: [{ $subtract: ["$consultationStartedAt", "$checkedInAt"] }, 60000] } },
+              n: { $sum: 1 },
+            },
+          },
         ],
       },
     },
@@ -80,9 +86,19 @@ const getStats = async (date: string) => {
         // Fees in poisha (feeSnapshot): expected for everyone not cancelled / no-show, "seen" for completed
         revenue: [
           { $match: { date, status: { $nin: ["cancelled", "no_show"] } } },
-          { $group: { _id: null, expected: { $sum: "$feeSnapshot" }, collected: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, "$feeSnapshot", 0] } } } },
+          {
+            $group: {
+              _id: null,
+              expected: { $sum: "$feeSnapshot" },
+              collected: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, "$feeSnapshot", 0] } },
+            },
+          },
         ],
-        last7Days: [{ $match: { status: { $ne: "cancelled" } } }, { $group: { _id: "$date", count: { $sum: 1 } } }, { $sort: { _id: 1 } }],
+        last7Days: [
+          { $match: { status: { $ne: "cancelled" } } },
+          { $group: { _id: "$date", count: { $sum: 1 } } },
+          { $sort: { _id: 1 } },
+        ],
       },
     },
   ]);
@@ -102,9 +118,16 @@ const getStats = async (date: string) => {
 
   return {
     date,
-    appointments: { total, byStatus, bySource, noShowRate: total ? Math.round(((byStatus.no_show ?? 0) / total) * 100) : 0 },
+    appointments: {
+      total,
+      byStatus,
+      bySource,
+      noShowRate: total ? Math.round(((byStatus.no_show ?? 0) / total) * 100) : 0,
+    },
     byDepartment: facets.byDepartment,
-    revenue: facets.revenue[0] ? { expected: facets.revenue[0].expected, collected: facets.revenue[0].collected } : { expected: 0, collected: 0 },
+    revenue: facets.revenue[0]
+      ? { expected: facets.revenue[0].expected, collected: facets.revenue[0].collected }
+      : { expected: 0, collected: 0 },
     ai: { chatSessions, bookingsByAi: bySource.chatbot ?? 0, emergencies, pendingHandoffs },
     last7Days: Array.from({ length: 7 }, (_, i) => {
       const d = addDays(weekStart, i);

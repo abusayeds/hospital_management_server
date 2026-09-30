@@ -10,41 +10,185 @@ const sessions = (days: number[], startTime: string, endTime: string, slotMinute
   days.map((dayOfWeek) => ({ dayOfWeek, startTime, endTime, slotMinutes, maxPatients }));
 
 export const DEPARTMENTS = [
-  { name: "Medicine", nameBn: "মেডিসিন", icon: "stethoscope", displayOrder: 1, description: "Fever, diabetes, blood pressure and general illness" },
-  { name: "Cardiology", nameBn: "হৃদরোগ", icon: "heart-pulse", displayOrder: 2, description: "Heart disease, chest pain follow-up, ECG and echo" },
-  { name: "Gynecology & Obstetrics", nameBn: "গাইনি ও প্রসূতি", icon: "baby", displayOrder: 3, description: "Women's health and pregnancy care" },
-  { name: "Pediatrics", nameBn: "শিশু", icon: "smile", displayOrder: 4, description: "Children's health, growth and vaccination advice" },
-  { name: "Orthopedics", nameBn: "হাড় ও জোড়া", icon: "bone", displayOrder: 5, description: "Bone, joint, back pain and fracture follow-up" },
+  {
+    name: "Medicine",
+    nameBn: "মেডিসিন",
+    icon: "stethoscope",
+    displayOrder: 1,
+    description: "Fever, diabetes, blood pressure and general illness",
+  },
+  {
+    name: "Cardiology",
+    nameBn: "হৃদরোগ",
+    icon: "heart-pulse",
+    displayOrder: 2,
+    description: "Heart disease, chest pain follow-up, ECG and echo",
+  },
+  {
+    name: "Gynecology & Obstetrics",
+    nameBn: "গাইনি ও প্রসূতি",
+    icon: "baby",
+    displayOrder: 3,
+    description: "Women's health and pregnancy care",
+  },
+  {
+    name: "Pediatrics",
+    nameBn: "শিশু",
+    icon: "smile",
+    displayOrder: 4,
+    description: "Children's health, growth and vaccination advice",
+  },
+  {
+    name: "Orthopedics",
+    nameBn: "হাড় ও জোড়া",
+    icon: "bone",
+    displayOrder: 5,
+    description: "Bone, joint, back pain and fracture follow-up",
+  },
   { name: "ENT", nameBn: "নাক কান গলা", icon: "ear", displayOrder: 6, description: "Ear, nose and throat problems" },
   { name: "Dermatology", nameBn: "চর্ম ও যৌন", icon: "hand", displayOrder: 7, description: "Skin, hair and allergy" },
-  { name: "Neurology", nameBn: "স্নায়ুরোগ", icon: "brain", displayOrder: 8, description: "Headache, stroke follow-up, epilepsy and nerve problems" },
+  {
+    name: "Neurology",
+    nameBn: "স্নায়ুরোগ",
+    icon: "brain",
+    displayOrder: 8,
+    description: "Headache, stroke follow-up, epilepsy and nerve problems",
+  },
 ];
 
 export const DOCTORS = [
-  { name: "Farhana Rahman", nameBn: "ফারহানা রহমান", title: "Dr.", dept: "Medicine", degrees: "MBBS, FCPS (Medicine)", specialization: "Diabetes & Hypertension", fee: 700, room: "101",
-    sessions: [...sessions(WORKDAYS, "09:00", "13:00", 10, 22)] },
-  { name: "Tanvir Ahmed", nameBn: "তানভীর আহমেদ", title: "Dr.", dept: "Medicine", degrees: "MBBS, MD (Internal Medicine)", specialization: "General Medicine", fee: 600, room: "102",
-    sessions: [...sessions(ALT_A, "17:00", "21:00", 10, 24), ...sessions(ALT_B, "10:00", "13:00", 10, 18)] },
-  { name: "Mahbub Hasan", nameBn: "মাহবুব হাসান", title: "Prof. Dr.", dept: "Cardiology", degrees: "MBBS, MD (Cardiology), FACC", specialization: "Interventional Cardiology", fee: 1500, room: "201",
-    sessions: sessions(ALT_B, "16:00", "20:00", 15, 16) },
-  { name: "Shahnaz Parvin", nameBn: "শাহনাজ পারভীন", title: "Dr.", dept: "Cardiology", degrees: "MBBS, FCPS (Medicine), MD (Cardiology)", specialization: "Heart Failure & Hypertension", fee: 1000, room: "202",
-    sessions: sessions(ALT_A, "10:00", "13:00", 15, 12) },
-  { name: "Nusrat Jahan", nameBn: "নুসরাত জাহান", title: "Dr.", dept: "Gynecology & Obstetrics", degrees: "MBBS, FCPS (Gynae & Obs)", specialization: "Pregnancy Care & Infertility", fee: 800, room: "301",
-    sessions: [...sessions(ALT_A, "11:00", "14:00", 10, 18), ...sessions(ALT_B, "17:00", "20:00", 10, 18)] },
-  { name: "Arif Hossain", nameBn: "আরিফ হোসেন", title: "Dr.", dept: "Pediatrics", degrees: "MBBS, DCH, MD (Pediatrics)", specialization: "Child Health & Nutrition", fee: 700, room: "103",
-    sessions: [...sessions(WORKDAYS, "09:30", "12:30", 10, 18), ...sessions([1, 3], "18:00", "20:00", 10, 12)] },
-  { name: "Kamrul Islam", nameBn: "কামরুল ইসলাম", title: "Assoc. Prof. Dr.", dept: "Orthopedics", degrees: "MBBS, MS (Orthopedics)", specialization: "Joint Replacement & Spine", fee: 1200, room: "203",
-    sessions: sessions(ALT_B, "17:00", "21:00", 15, 16) },
-  { name: "Rashida Begum", nameBn: "রাশিদা বেগম", title: "Dr.", dept: "Orthopedics", degrees: "MBBS, D-Ortho", specialization: "Sports Injury & Fracture Care", fee: 800, room: "204",
-    sessions: sessions(ALT_A, "10:00", "13:00", 10, 18) },
-  { name: "Sadia Akter", nameBn: "সাদিয়া আক্তার", title: "Dr.", dept: "ENT", degrees: "MBBS, DLO, FCPS (ENT)", specialization: "Ear, Nose & Throat", fee: 600, room: "104",
-    sessions: [...sessions(ALT_A, "15:00", "18:00", 10, 18), ...sessions(ALT_B, "09:00", "12:00", 10, 18)] },
-  { name: "Rezaul Karim", nameBn: "রেজাউল করিম", title: "Dr.", dept: "Dermatology", degrees: "MBBS, DDV, FCPS (Dermatology)", specialization: "Skin, Hair & Allergy", fee: 600, room: "105",
-    sessions: sessions(WORKDAYS, "16:00", "19:00", 10, 18) },
-  { name: "Imran Chowdhury", nameBn: "ইমরান চৌধুরী", title: "Dr.", dept: "Neurology", degrees: "MBBS, MD (Neurology)", specialization: "Headache, Epilepsy & Stroke", fee: 1000, room: "205",
-    sessions: sessions(ALT_B, "10:00", "13:00", 15, 12) },
-  { name: "Selina Hossain", nameBn: "সেলিনা হোসেন", title: "Dr.", dept: "Medicine", degrees: "MBBS, MRCP (UK)", specialization: "Thyroid & Endocrine", fee: 900, room: "106",
-    sessions: sessions([6, 0, 2], "18:00", "21:00", 10, 18) },
+  {
+    name: "Farhana Rahman",
+    nameBn: "ফারহানা রহমান",
+    title: "Dr.",
+    dept: "Medicine",
+    degrees: "MBBS, FCPS (Medicine)",
+    specialization: "Diabetes & Hypertension",
+    fee: 700,
+    room: "101",
+    sessions: [...sessions(WORKDAYS, "09:00", "13:00", 10, 22)],
+  },
+  {
+    name: "Tanvir Ahmed",
+    nameBn: "তানভীর আহমেদ",
+    title: "Dr.",
+    dept: "Medicine",
+    degrees: "MBBS, MD (Internal Medicine)",
+    specialization: "General Medicine",
+    fee: 600,
+    room: "102",
+    sessions: [...sessions(ALT_A, "17:00", "21:00", 10, 24), ...sessions(ALT_B, "10:00", "13:00", 10, 18)],
+  },
+  {
+    name: "Mahbub Hasan",
+    nameBn: "মাহবুব হাসান",
+    title: "Prof. Dr.",
+    dept: "Cardiology",
+    degrees: "MBBS, MD (Cardiology), FACC",
+    specialization: "Interventional Cardiology",
+    fee: 1500,
+    room: "201",
+    sessions: sessions(ALT_B, "16:00", "20:00", 15, 16),
+  },
+  {
+    name: "Shahnaz Parvin",
+    nameBn: "শাহনাজ পারভীন",
+    title: "Dr.",
+    dept: "Cardiology",
+    degrees: "MBBS, FCPS (Medicine), MD (Cardiology)",
+    specialization: "Heart Failure & Hypertension",
+    fee: 1000,
+    room: "202",
+    sessions: sessions(ALT_A, "10:00", "13:00", 15, 12),
+  },
+  {
+    name: "Nusrat Jahan",
+    nameBn: "নুসরাত জাহান",
+    title: "Dr.",
+    dept: "Gynecology & Obstetrics",
+    degrees: "MBBS, FCPS (Gynae & Obs)",
+    specialization: "Pregnancy Care & Infertility",
+    fee: 800,
+    room: "301",
+    sessions: [...sessions(ALT_A, "11:00", "14:00", 10, 18), ...sessions(ALT_B, "17:00", "20:00", 10, 18)],
+  },
+  {
+    name: "Arif Hossain",
+    nameBn: "আরিফ হোসেন",
+    title: "Dr.",
+    dept: "Pediatrics",
+    degrees: "MBBS, DCH, MD (Pediatrics)",
+    specialization: "Child Health & Nutrition",
+    fee: 700,
+    room: "103",
+    sessions: [...sessions(WORKDAYS, "09:30", "12:30", 10, 18), ...sessions([1, 3], "18:00", "20:00", 10, 12)],
+  },
+  {
+    name: "Kamrul Islam",
+    nameBn: "কামরুল ইসলাম",
+    title: "Assoc. Prof. Dr.",
+    dept: "Orthopedics",
+    degrees: "MBBS, MS (Orthopedics)",
+    specialization: "Joint Replacement & Spine",
+    fee: 1200,
+    room: "203",
+    sessions: sessions(ALT_B, "17:00", "21:00", 15, 16),
+  },
+  {
+    name: "Rashida Begum",
+    nameBn: "রাশিদা বেগম",
+    title: "Dr.",
+    dept: "Orthopedics",
+    degrees: "MBBS, D-Ortho",
+    specialization: "Sports Injury & Fracture Care",
+    fee: 800,
+    room: "204",
+    sessions: sessions(ALT_A, "10:00", "13:00", 10, 18),
+  },
+  {
+    name: "Sadia Akter",
+    nameBn: "সাদিয়া আক্তার",
+    title: "Dr.",
+    dept: "ENT",
+    degrees: "MBBS, DLO, FCPS (ENT)",
+    specialization: "Ear, Nose & Throat",
+    fee: 600,
+    room: "104",
+    sessions: [...sessions(ALT_A, "15:00", "18:00", 10, 18), ...sessions(ALT_B, "09:00", "12:00", 10, 18)],
+  },
+  {
+    name: "Rezaul Karim",
+    nameBn: "রেজাউল করিম",
+    title: "Dr.",
+    dept: "Dermatology",
+    degrees: "MBBS, DDV, FCPS (Dermatology)",
+    specialization: "Skin, Hair & Allergy",
+    fee: 600,
+    room: "105",
+    sessions: sessions(WORKDAYS, "16:00", "19:00", 10, 18),
+  },
+  {
+    name: "Imran Chowdhury",
+    nameBn: "ইমরান চৌধুরী",
+    title: "Dr.",
+    dept: "Neurology",
+    degrees: "MBBS, MD (Neurology)",
+    specialization: "Headache, Epilepsy & Stroke",
+    fee: 1000,
+    room: "205",
+    sessions: sessions(ALT_B, "10:00", "13:00", 15, 12),
+  },
+  {
+    name: "Selina Hossain",
+    nameBn: "সেলিনা হোসেন",
+    title: "Dr.",
+    dept: "Medicine",
+    degrees: "MBBS, MRCP (UK)",
+    specialization: "Thyroid & Endocrine",
+    fee: 900,
+    room: "106",
+    sessions: sessions([6, 0, 2], "18:00", "21:00", 10, 18),
+  },
 ].map(({ fee, room, dept, ...d }) => ({
   ...d,
   dept,
@@ -76,8 +220,27 @@ export const SERVICES = [
 ];
 
 type P = { name: string; unit?: string; normalMin?: number; normalMax?: number; normalText?: string };
-const lab = (code: string, name: string, category: string, price: number, sampleType: string, turnaroundHours: number, parameters: P[], preparationNote?: string, preparationNoteBn?: string) =>
-  ({ code, name, category, price: T(price), sampleType, turnaroundHours, parameters, preparationNote, preparationNoteBn });
+const lab = (
+  code: string,
+  name: string,
+  category: string,
+  price: number,
+  sampleType: string,
+  turnaroundHours: number,
+  parameters: P[],
+  preparationNote?: string,
+  preparationNoteBn?: string,
+) => ({
+  code,
+  name,
+  category,
+  price: T(price),
+  sampleType,
+  turnaroundHours,
+  parameters,
+  preparationNote,
+  preparationNoteBn,
+});
 const FASTING = ["Fasting 8–10 hours (water allowed)", "৮–১০ ঘণ্টা খালি পেটে আসুন (পানি খাওয়া যাবে)"] as const;
 
 export const LAB_TESTS = [
@@ -89,52 +252,172 @@ export const LAB_TESTS = [
     { name: "Platelet count", unit: "/cmm", normalMin: 150000, normalMax: 450000 },
     { name: "ESR", unit: "mm/1st hr", normalMin: 0, normalMax: 20 },
   ]),
-  lab("ESR", "Erythrocyte Sedimentation Rate", "Hematology", 150, "Blood (EDTA)", 4, [{ name: "ESR", unit: "mm/1st hr", normalMin: 0, normalMax: 20 }]),
-  lab("BG-RH", "Blood Grouping & Rh Typing", "Hematology", 200, "Blood (EDTA)", 2, [{ name: "Blood group", normalText: "A/B/AB/O" }, { name: "Rh factor", normalText: "Positive/Negative" }]),
-  lab("RBS", "Random Blood Sugar", "Biochemistry", 150, "Blood (fluoride)", 2, [{ name: "Glucose (random)", unit: "mmol/L", normalMin: 3.9, normalMax: 7.8 }]),
-  lab("FBS", "Fasting Blood Sugar", "Biochemistry", 150, "Blood (fluoride)", 2, [{ name: "Glucose (fasting)", unit: "mmol/L", normalMin: 3.9, normalMax: 6.1 }], ...FASTING),
-  lab("2HABF", "Blood Sugar 2 Hours After Breakfast", "Biochemistry", 150, "Blood (fluoride)", 2, [{ name: "Glucose (2h ABF)", unit: "mmol/L", normalMin: 3.9, normalMax: 7.8 }], "Come exactly 2 hours after breakfast", "নাস্তার ঠিক ২ ঘণ্টা পর আসুন"),
-  lab("HBA1C", "HbA1c (Glycated Hemoglobin)", "Biochemistry", 1000, "Blood (EDTA)", 24, [{ name: "HbA1c", unit: "%", normalMin: 4, normalMax: 5.6 }]),
-  lab("LIPID", "Lipid Profile", "Biochemistry", 1000, "Blood (clotted)", 12, [
-    { name: "Total cholesterol", unit: "mg/dL", normalMin: 0, normalMax: 200 },
-    { name: "Triglycerides", unit: "mg/dL", normalMin: 0, normalMax: 150 },
-    { name: "HDL cholesterol", unit: "mg/dL", normalMin: 40, normalMax: 100 },
-    { name: "LDL cholesterol", unit: "mg/dL", normalMin: 0, normalMax: 130 },
-  ], "Fasting 10–12 hours", "১০–১২ ঘণ্টা খালি পেটে আসুন"),
-  lab("CREAT", "Serum Creatinine", "Biochemistry", 400, "Blood (clotted)", 6, [{ name: "Creatinine", unit: "mg/dL", normalMin: 0.6, normalMax: 1.3 }]),
-  lab("UREA", "Blood Urea", "Biochemistry", 400, "Blood (clotted)", 6, [{ name: "Urea", unit: "mg/dL", normalMin: 15, normalMax: 40 }]),
-  lab("SGPT", "SGPT (ALT)", "Biochemistry", 400, "Blood (clotted)", 6, [{ name: "ALT", unit: "U/L", normalMin: 0, normalMax: 40 }]),
-  lab("SGOT", "SGOT (AST)", "Biochemistry", 400, "Blood (clotted)", 6, [{ name: "AST", unit: "U/L", normalMin: 0, normalMax: 40 }]),
-  lab("BILI", "Serum Bilirubin (Total)", "Biochemistry", 350, "Blood (clotted)", 6, [{ name: "Total bilirubin", unit: "mg/dL", normalMin: 0.2, normalMax: 1.2 }]),
-  lab("URIC", "Serum Uric Acid", "Biochemistry", 450, "Blood (clotted)", 6, [{ name: "Uric acid", unit: "mg/dL", normalMin: 3.5, normalMax: 7.2 }]),
+  lab("ESR", "Erythrocyte Sedimentation Rate", "Hematology", 150, "Blood (EDTA)", 4, [
+    { name: "ESR", unit: "mm/1st hr", normalMin: 0, normalMax: 20 },
+  ]),
+  lab("BG-RH", "Blood Grouping & Rh Typing", "Hematology", 200, "Blood (EDTA)", 2, [
+    { name: "Blood group", normalText: "A/B/AB/O" },
+    { name: "Rh factor", normalText: "Positive/Negative" },
+  ]),
+  lab("RBS", "Random Blood Sugar", "Biochemistry", 150, "Blood (fluoride)", 2, [
+    { name: "Glucose (random)", unit: "mmol/L", normalMin: 3.9, normalMax: 7.8 },
+  ]),
+  lab(
+    "FBS",
+    "Fasting Blood Sugar",
+    "Biochemistry",
+    150,
+    "Blood (fluoride)",
+    2,
+    [{ name: "Glucose (fasting)", unit: "mmol/L", normalMin: 3.9, normalMax: 6.1 }],
+    ...FASTING,
+  ),
+  lab(
+    "2HABF",
+    "Blood Sugar 2 Hours After Breakfast",
+    "Biochemistry",
+    150,
+    "Blood (fluoride)",
+    2,
+    [{ name: "Glucose (2h ABF)", unit: "mmol/L", normalMin: 3.9, normalMax: 7.8 }],
+    "Come exactly 2 hours after breakfast",
+    "নাস্তার ঠিক ২ ঘণ্টা পর আসুন",
+  ),
+  lab("HBA1C", "HbA1c (Glycated Hemoglobin)", "Biochemistry", 1000, "Blood (EDTA)", 24, [
+    { name: "HbA1c", unit: "%", normalMin: 4, normalMax: 5.6 },
+  ]),
+  lab(
+    "LIPID",
+    "Lipid Profile",
+    "Biochemistry",
+    1000,
+    "Blood (clotted)",
+    12,
+    [
+      { name: "Total cholesterol", unit: "mg/dL", normalMin: 0, normalMax: 200 },
+      { name: "Triglycerides", unit: "mg/dL", normalMin: 0, normalMax: 150 },
+      { name: "HDL cholesterol", unit: "mg/dL", normalMin: 40, normalMax: 100 },
+      { name: "LDL cholesterol", unit: "mg/dL", normalMin: 0, normalMax: 130 },
+    ],
+    "Fasting 10–12 hours",
+    "১০–১২ ঘণ্টা খালি পেটে আসুন",
+  ),
+  lab("CREAT", "Serum Creatinine", "Biochemistry", 400, "Blood (clotted)", 6, [
+    { name: "Creatinine", unit: "mg/dL", normalMin: 0.6, normalMax: 1.3 },
+  ]),
+  lab("UREA", "Blood Urea", "Biochemistry", 400, "Blood (clotted)", 6, [
+    { name: "Urea", unit: "mg/dL", normalMin: 15, normalMax: 40 },
+  ]),
+  lab("SGPT", "SGPT (ALT)", "Biochemistry", 400, "Blood (clotted)", 6, [
+    { name: "ALT", unit: "U/L", normalMin: 0, normalMax: 40 },
+  ]),
+  lab("SGOT", "SGOT (AST)", "Biochemistry", 400, "Blood (clotted)", 6, [
+    { name: "AST", unit: "U/L", normalMin: 0, normalMax: 40 },
+  ]),
+  lab("BILI", "Serum Bilirubin (Total)", "Biochemistry", 350, "Blood (clotted)", 6, [
+    { name: "Total bilirubin", unit: "mg/dL", normalMin: 0.2, normalMax: 1.2 },
+  ]),
+  lab("URIC", "Serum Uric Acid", "Biochemistry", 450, "Blood (clotted)", 6, [
+    { name: "Uric acid", unit: "mg/dL", normalMin: 3.5, normalMax: 7.2 },
+  ]),
   lab("ELECT", "Serum Electrolytes", "Biochemistry", 900, "Blood (clotted)", 8, [
     { name: "Sodium", unit: "mmol/L", normalMin: 135, normalMax: 145 },
     { name: "Potassium", unit: "mmol/L", normalMin: 3.5, normalMax: 5.1 },
     { name: "Chloride", unit: "mmol/L", normalMin: 98, normalMax: 107 },
   ]),
-  lab("TSH", "Thyroid Stimulating Hormone (TSH)", "Hormone", 900, "Blood (clotted)", 24, [{ name: "TSH", unit: "µIU/mL", normalMin: 0.4, normalMax: 4.5 }]),
-  lab("FT4", "Free T4", "Hormone", 900, "Blood (clotted)", 24, [{ name: "Free T4", unit: "ng/dL", normalMin: 0.8, normalMax: 1.8 }]),
-  lab("VITD", "Vitamin D (25-OH)", "Hormone", 2500, "Blood (clotted)", 48, [{ name: "25-OH Vitamin D", unit: "ng/mL", normalMin: 30, normalMax: 100 }]),
-  lab("CRP", "C-Reactive Protein", "Immunology", 700, "Blood (clotted)", 6, [{ name: "CRP", unit: "mg/L", normalMin: 0, normalMax: 6 }]),
-  lab("WIDAL", "Widal Test", "Immunology", 350, "Blood (clotted)", 6, [{ name: "S. Typhi O", normalText: "< 1:80" }, { name: "S. Typhi H", normalText: "< 1:160" }]),
-  lab("DENGUE", "Dengue NS1 Antigen", "Immunology", 500, "Blood (clotted)", 4, [{ name: "NS1 antigen", normalText: "Negative" }]),
-  lab("HBSAG", "HBsAg (Hepatitis B)", "Immunology", 500, "Blood (clotted)", 6, [{ name: "HBsAg", normalText: "Negative" }]),
-  lab("URE", "Urine Routine Examination (R/E)", "Clinical Pathology", 250, "Urine (midstream)", 4, [
-    { name: "Colour", normalText: "Straw" },
-    { name: "Protein", normalText: "Nil" },
-    { name: "Sugar", normalText: "Nil" },
-    { name: "Pus cells", unit: "/HPF", normalMin: 0, normalMax: 5 },
-    { name: "RBC", unit: "/HPF", normalMin: 0, normalMax: 2 },
-  ], "First morning urine, midstream, in a clean container", "সকালের প্রথম প্রস্রাব, মাঝের অংশ, পরিষ্কার পাত্রে"),
-  lab("STOOL", "Stool Routine Examination", "Clinical Pathology", 250, "Stool", 6, [{ name: "Ova/cyst", normalText: "Not found" }, { name: "Occult blood", normalText: "Negative" }]),
-  lab("XRAY-CH", "X-Ray Chest (P/A view)", "Radiology", 600, "Imaging", 4, [{ name: "Impression", normalText: "Normal study" }], "Remove metal objects and jewellery", "গয়না ও ধাতব জিনিস খুলে আসুন"),
-  lab("ECG", "ECG (12 lead)", "Cardiac", 400, "Procedure", 1, [{ name: "Impression", normalText: "Normal sinus rhythm" }]),
-  lab("ECHO", "Echocardiography (2D)", "Cardiac", 2500, "Imaging", 24, [{ name: "Ejection fraction", unit: "%", normalMin: 55, normalMax: 70 }]),
-  lab("USG-WA", "USG of Whole Abdomen", "Radiology", 1800, "Imaging", 6, [{ name: "Impression", normalText: "Normal study" }], "Fasting 6 hours and a full bladder (drink water 1 hour before)", "৬ ঘণ্টা খালি পেটে; ১ ঘণ্টা আগে পানি খেয়ে মূত্রথলি ভরা রাখুন"),
+  lab("TSH", "Thyroid Stimulating Hormone (TSH)", "Hormone", 900, "Blood (clotted)", 24, [
+    { name: "TSH", unit: "µIU/mL", normalMin: 0.4, normalMax: 4.5 },
+  ]),
+  lab("FT4", "Free T4", "Hormone", 900, "Blood (clotted)", 24, [
+    { name: "Free T4", unit: "ng/dL", normalMin: 0.8, normalMax: 1.8 },
+  ]),
+  lab("VITD", "Vitamin D (25-OH)", "Hormone", 2500, "Blood (clotted)", 48, [
+    { name: "25-OH Vitamin D", unit: "ng/mL", normalMin: 30, normalMax: 100 },
+  ]),
+  lab("CRP", "C-Reactive Protein", "Immunology", 700, "Blood (clotted)", 6, [
+    { name: "CRP", unit: "mg/L", normalMin: 0, normalMax: 6 },
+  ]),
+  lab("WIDAL", "Widal Test", "Immunology", 350, "Blood (clotted)", 6, [
+    { name: "S. Typhi O", normalText: "< 1:80" },
+    { name: "S. Typhi H", normalText: "< 1:160" },
+  ]),
+  lab("DENGUE", "Dengue NS1 Antigen", "Immunology", 500, "Blood (clotted)", 4, [
+    { name: "NS1 antigen", normalText: "Negative" },
+  ]),
+  lab("HBSAG", "HBsAg (Hepatitis B)", "Immunology", 500, "Blood (clotted)", 6, [
+    { name: "HBsAg", normalText: "Negative" },
+  ]),
+  lab(
+    "URE",
+    "Urine Routine Examination (R/E)",
+    "Clinical Pathology",
+    250,
+    "Urine (midstream)",
+    4,
+    [
+      { name: "Colour", normalText: "Straw" },
+      { name: "Protein", normalText: "Nil" },
+      { name: "Sugar", normalText: "Nil" },
+      { name: "Pus cells", unit: "/HPF", normalMin: 0, normalMax: 5 },
+      { name: "RBC", unit: "/HPF", normalMin: 0, normalMax: 2 },
+    ],
+    "First morning urine, midstream, in a clean container",
+    "সকালের প্রথম প্রস্রাব, মাঝের অংশ, পরিষ্কার পাত্রে",
+  ),
+  lab("STOOL", "Stool Routine Examination", "Clinical Pathology", 250, "Stool", 6, [
+    { name: "Ova/cyst", normalText: "Not found" },
+    { name: "Occult blood", normalText: "Negative" },
+  ]),
+  lab(
+    "XRAY-CH",
+    "X-Ray Chest (P/A view)",
+    "Radiology",
+    600,
+    "Imaging",
+    4,
+    [{ name: "Impression", normalText: "Normal study" }],
+    "Remove metal objects and jewellery",
+    "গয়না ও ধাতব জিনিস খুলে আসুন",
+  ),
+  lab("ECG", "ECG (12 lead)", "Cardiac", 400, "Procedure", 1, [
+    { name: "Impression", normalText: "Normal sinus rhythm" },
+  ]),
+  lab("ECHO", "Echocardiography (2D)", "Cardiac", 2500, "Imaging", 24, [
+    { name: "Ejection fraction", unit: "%", normalMin: 55, normalMax: 70 },
+  ]),
+  lab(
+    "USG-WA",
+    "USG of Whole Abdomen",
+    "Radiology",
+    1800,
+    "Imaging",
+    6,
+    [{ name: "Impression", normalText: "Normal study" }],
+    "Fasting 6 hours and a full bladder (drink water 1 hour before)",
+    "৬ ঘণ্টা খালি পেটে; ১ ঘণ্টা আগে পানি খেয়ে মূত্রথলি ভরা রাখুন",
+  ),
 ];
 
-type Form = "tablet" | "capsule" | "syrup" | "suspension" | "injection" | "drops" | "cream" | "ointment" | "inhaler" | "suppository" | "powder" | "gel";
-const med = (brandName: string, genericName: string, strength: string, form: Form, manufacturer: string) => ({ brandName, genericName, strength, form, manufacturer });
+type Form =
+  | "tablet"
+  | "capsule"
+  | "syrup"
+  | "suspension"
+  | "injection"
+  | "drops"
+  | "cream"
+  | "ointment"
+  | "inhaler"
+  | "suppository"
+  | "powder"
+  | "gel";
+const med = (brandName: string, genericName: string, strength: string, form: Form, manufacturer: string) => ({
+  brandName,
+  genericName,
+  strength,
+  form,
+  manufacturer,
+});
 
 export const MEDICINES = [
   med("Napa", "Paracetamol", "500 mg", "tablet", "Beximco"),

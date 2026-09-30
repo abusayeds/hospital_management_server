@@ -32,7 +32,11 @@ export const seedHospitalData = async () => {
   const newDoctors = await upsertAll(DoctorModel, doctorRows, (d) => ({ name: d.name }));
   const newServices = await upsertAll(ServiceModel, SERVICES, (s) => ({ name: s.name }));
   const newTests = await upsertAll(LabTestModel, LAB_TESTS, (t) => ({ code: t.code }));
-  const newMedicines = await upsertAll(MedicineModel, MEDICINES, (m) => ({ brandName: m.brandName, strength: m.strength, form: m.form }));
+  const newMedicines = await upsertAll(MedicineModel, MEDICINES, (m) => ({
+    brandName: m.brandName,
+    strength: m.strength,
+    form: m.form,
+  }));
 
   const total = newDepartments + newDoctors + newServices + newTests + newMedicines;
   if (total) {

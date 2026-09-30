@@ -19,7 +19,8 @@ import {
   AppointmentStatus,
   Priority,
 } from "./appointment.model";
-import { notifyAppointmentChanged } from "./appointment.events";
+import { notifyAppointmentChanged, publishAppointmentStatus } from "./appointment.events";
+import { publish } from "../../../events/bus";
 
 /**
  * BOOKING SERVICE — the ONE place appointments are created and moved between statuses.
@@ -41,7 +42,12 @@ export const ALLOWED_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]>
 
 export const assertTransition = (from: AppointmentStatus, to: AppointmentStatus) => {
   if (!ALLOWED_TRANSITIONS[from].includes(to)) {
-    throw new AppError(409, `An appointment that is "${from.replace("_", " ")}" cannot become "${to.replace("_", " ")}".`, "CONFLICT", { from, to });
+    throw new AppError(
+      409,
+      `An appointment that is "${from.replace("_", " ")}" cannot become "${to.replace("_", " ")}".`,
+      "CONFLICT",
+      { from, to },
+    );
   }
 };
 
@@ -116,9 +122,16 @@ export const toAppointmentView = (a: any) => ({
       }
     : { id: String(a.patient) },
   doctor: a.doctor?._id
-    ? { id: String(a.doctor._id), displayName: `${a.doctor.title ?? ""} ${a.doctor.name}`.trim(), nameBn: a.doctor.nameBn, roomNo: a.doctor.roomNo }
+    ? {
+        id: String(a.doctor._id),
+        displayName: `${a.doctor.title ?? ""} ${a.doctor.name}`.trim(),
+        nameBn: a.doctor.nameBn,
+        roomNo: a.doctor.roomNo,
+      }
     : { id: String(a.doctor) },
-  department: a.department?._id ? { id: String(a.department._id), name: a.department.name, nameBn: a.department.nameBn } : { id: String(a.department) },
+  department: a.department?._id
+    ? { id: String(a.department._id), name: a.department.name, nameBn: a.department.nameBn }
+    : { id: String(a.department) },
   createdAt: a.createdAt,
 });
 
@@ -147,7 +160,11 @@ export type BookInput = {
   checkInNow?: boolean; // walk-in: book and check in at once
 };
 
-const nextSlotsHint = (day: DaySlots) => day.slots.filter((s) => s.available).slice(0, 5).map((s) => s.time);
+const nextSlotsHint = (day: DaySlots) =>
+  day.slots
+    .filter((s) => s.available)
+    .slice(0, 5)
+    .map((s) => s.time);
 
 const REASON_TEXT = { booked: "already booked", past: "already over", session_full: "in a full session" } as const;
 
@@ -164,27 +181,50 @@ const detectVisitType = async (patientId: Types.ObjectId, doctor: any, date: str
 };
 
 /** Book inside an existing transaction (used by bookAppointment and rescheduleAppointment) */
-const bookWithinSession = async (input: BookInput, actor: Actor, session: ClientSession, extra: { rescheduledFrom?: Types.ObjectId } = {}) => {
+const bookWithinSession = async (
+  input: BookInput,
+  actor: Actor,
+  session: ClientSession,
+  extra: { rescheduledFrom?: Types.ObjectId } = {},
+) => {
   const doctor = await loadActiveDoctor(input.doctorId, session);
   const patient = await findPatientOrThrow(input.patientId, session);
   const day = await getDaySlotsFor(doctor, input.date, session);
 
-  if (day.onLeave) throw new AppError(400, `The doctor is on leave on ${input.date}${day.leaveReason ? ` (${day.leaveReason})` : ""}.`);
-  if (!day.sessions.length) throw new AppError(400, `The doctor does not sit on ${input.date}. Please choose another day.`);
+  if (day.onLeave)
+    throw new AppError(
+      400,
+      `The doctor is on leave on ${input.date}${day.leaveReason ? ` (${day.leaveReason})` : ""}.`,
+    );
+  if (!day.sessions.length)
+    throw new AppError(400, `The doctor does not sit on ${input.date}. Please choose another day.`);
 
   const slot = input.slotTime ? day.slots.find((s) => s.time === input.slotTime) : day.nextAvailable;
-  if (input.slotTime && !slot) throw new AppError(400, `${input.slotTime} is not in the doctor's schedule on ${input.date}.`);
+  if (input.slotTime && !slot)
+    throw new AppError(400, `${input.slotTime} is not in the doctor's schedule on ${input.date}.`);
   if (!slot) throw new AppError(409, "No free slots left on this day.", "CONFLICT", { nextSlots: [] });
   if (!slot.available) {
-    throw new AppError(409, `${slot.time} is ${REASON_TEXT[slot.reason!]}. Please choose another time.`, "CONFLICT", { nextSlots: nextSlotsHint(day) });
+    throw new AppError(409, `${slot.time} is ${REASON_TEXT[slot.reason!]}. Please choose another time.`, "CONFLICT", {
+      nextSlots: nextSlotsHint(day),
+    });
   }
 
   // Friendly check before the unique index would fire
-  const existing = await AppointmentModel.findOne({ patient: patient._id, doctor: doctor._id, date: input.date, holdsSlot: true }).session(session);
+  const existing = await AppointmentModel.findOne({
+    patient: patient._id,
+    doctor: doctor._id,
+    date: input.date,
+    holdsSlot: true,
+  }).session(session);
   if (existing) {
-    throw new AppError(409, `This patient already has serial ${existing.serialNo} with this doctor on ${input.date} at ${existing.slotTime}.`, "CONFLICT", {
-      existingAppointmentId: String(existing._id),
-    });
+    throw new AppError(
+      409,
+      `This patient already has serial ${existing.serialNo} with this doctor on ${input.date} at ${existing.slotTime}.`,
+      "CONFLICT",
+      {
+        existingAppointmentId: String(existing._id),
+      },
+    );
   }
 
   const type = await detectVisitType(patient._id, doctor, input.date, session);
@@ -210,7 +250,10 @@ const bookWithinSession = async (input: BookInput, actor: Actor, session: Client
         priority: input.priority ?? "normal",
         status,
         holdsSlot: true,
-        statusHistory: [{ status: "booked", at: now, by }, ...(input.checkInNow ? [{ status: "checked_in" as const, at: now, by, note: "walk-in" }] : [])],
+        statusHistory: [
+          { status: "booked", at: now, by },
+          ...(input.checkInNow ? [{ status: "checked_in" as const, at: now, by, note: "walk-in" }] : []),
+        ],
         checkedInAt: input.checkInNow ? now : null,
         notes: input.notes,
         chatSessionId: input.chatSessionId ?? null,
@@ -231,7 +274,9 @@ const translateDuplicate = async (err: any, input: BookInput): Promise<never> =>
   const samePatient = String(err?.message ?? "").includes("uniq_active_patient_doctor_day");
   throw new AppError(
     409,
-    samePatient ? "This patient already has an appointment with this doctor on that day." : "That slot was just taken by another booking. Please choose another time.",
+    samePatient
+      ? "This patient already has an appointment with this doctor on that day."
+      : "That slot was just taken by another booking. Please choose another time.",
     "CONFLICT",
     { nextSlots: day ? nextSlotsHint(day) : [] },
   );
@@ -260,26 +305,52 @@ export const bookAppointment = async (input: BookInput, actor: Actor = {}) => {
     action: "CREATE",
     entityType: "Appointment",
     entityId: created._id,
-    after: { patient: result.patient.patientCode, doctor: result.doctor.displayName, date: result.date, slotTime: result.slotTime, serialNo: result.serialNo, source: result.source, status: result.status },
+    after: {
+      patient: result.patient.patientCode,
+      doctor: result.doctor.displayName,
+      date: result.date,
+      slotTime: result.slotTime,
+      serialNo: result.serialNo,
+      source: result.source,
+      status: result.status,
+    },
   });
   notifyAppointmentChanged(result);
+  publishAppointmentStatus(result);
   return result;
 };
 
 // ------------------------------------------------------------------ status changes
 
 /** Load → apply transition → save → audit → realtime event. Used by every simple status action. */
-export const changeStatus = async (id: string, to: AppointmentStatus, actor: Actor, opts: { note?: string; session?: ClientSession; assert?: (a: AppointmentDocument) => void } = {}) => {
+export const changeStatus = async (
+  id: string,
+  to: AppointmentStatus,
+  actor: Actor,
+  opts: { note?: string; session?: ClientSession; assert?: (a: AppointmentDocument) => void } = {},
+) => {
   const appt = await loadAppointment(id, opts.session);
   opts.assert?.(appt);
   const from = appt.status;
   applyTransition(appt, to, actor, opts.note);
   await appt.save({ session: opts.session });
-  if (to === "completed") await PatientModel.updateOne({ _id: appt.patient }, { $set: { lastVisitDate: appt.date } }, { session: opts.session });
+  if (to === "completed")
+    await PatientModel.updateOne(
+      { _id: appt.patient },
+      { $set: { lastVisitDate: appt.date } },
+      { session: opts.session },
+    );
   return { appt, from };
 };
 
-const finishChange = async (appt: AppointmentDocument, from: AppointmentStatus, actor: Actor, action: "UPDATE" | "DELETE" = "UPDATE", meta?: Record<string, unknown>) => {
+const finishChange = async (
+  appt: AppointmentDocument,
+  from: AppointmentStatus,
+  actor: Actor,
+  action: "UPDATE" | "DELETE" = "UPDATE",
+  meta?: Record<string, unknown>,
+  opts: { publishEvent?: boolean } = {},
+) => {
   const result = await view(appt);
   await recordAudit({
     req: actor.req,
@@ -291,13 +362,15 @@ const finishChange = async (appt: AppointmentDocument, from: AppointmentStatus, 
     meta: { serialNo: appt.serialNo, date: appt.date, ...meta },
   });
   notifyAppointmentChanged(result);
+  if (opts.publishEvent !== false) publishAppointmentStatus(result, from);
   return result;
 };
 
 export const checkIn = async (id: string, actor: Actor, priority?: Priority) => {
   const { appt, from } = await changeStatus(id, "checked_in", actor, {
     assert: (a) => {
-      if (a.date !== todayInDhaka()) throw new AppError(409, `Only today's appointments can be checked in (this one is on ${a.date}).`, "CONFLICT");
+      if (a.date !== todayInDhaka())
+        throw new AppError(409, `Only today's appointments can be checked in (this one is on ${a.date}).`, "CONFLICT");
     },
   });
   if (priority && priority !== appt.priority) {
@@ -310,7 +383,8 @@ export const checkIn = async (id: string, actor: Actor, priority?: Priority) => 
 export const markNoShow = async (id: string, actor: Actor) => {
   const { appt, from } = await changeStatus(id, "no_show", actor, {
     assert: (a) => {
-      if (a.date > todayInDhaka()) throw new AppError(409, "A future appointment cannot be marked as no-show.", "CONFLICT");
+      if (a.date > todayInDhaka())
+        throw new AppError(409, "A future appointment cannot be marked as no-show.", "CONFLICT");
     },
   });
   return finishChange(appt, from, actor);
@@ -320,7 +394,12 @@ export const markNoShow = async (id: string, actor: Actor) => {
  * Cancel. Staff may cancel any time; channels acting for the patient (chatbot, WhatsApp)
  * must respect the hospital's cancellation cut-off (`enforceCutoffMinutes`).
  */
-export const cancelAppointment = async (id: string, reason: string, actor: Actor, opts: { enforceCutoffMinutes?: number; session?: ClientSession } = {}) => {
+export const cancelAppointment = async (
+  id: string,
+  reason: string,
+  actor: Actor,
+  opts: { enforceCutoffMinutes?: number; session?: ClientSession } = {},
+) => {
   const { appt, from } = await changeStatus(id, "cancelled", actor, {
     note: reason,
     session: opts.session,
@@ -328,7 +407,11 @@ export const cancelAppointment = async (id: string, reason: string, actor: Actor
       if (opts.enforceCutoffMinutes === undefined) return;
       const minutesLeft = a.date === todayInDhaka() ? toMinutes(a.slotTime) - nowMinutesInDhaka() : Infinity;
       if (minutesLeft < opts.enforceCutoffMinutes) {
-        throw new AppError(409, `Appointments can only be cancelled up to ${opts.enforceCutoffMinutes} minutes before the time.`, "CONFLICT");
+        throw new AppError(
+          409,
+          `Appointments can only be cancelled up to ${opts.enforceCutoffMinutes} minutes before the time.`,
+          "CONFLICT",
+        );
       }
     },
   });
@@ -337,7 +420,11 @@ export const cancelAppointment = async (id: string, reason: string, actor: Actor
 };
 
 /** Move to another date/time (and optionally another doctor): cancel + rebook in ONE transaction */
-export const rescheduleAppointment = async (id: string, target: { date: string; slotTime?: string; doctorId?: string }, actor: Actor) => {
+export const rescheduleAppointment = async (
+  id: string,
+  target: { date: string; slotTime?: string; doctorId?: string },
+  actor: Actor,
+) => {
   await assertBookableDate(target.date);
   const original = await loadAppointment(id);
   if (!["booked", "checked_in"].includes(original.status)) {
@@ -358,7 +445,12 @@ export const rescheduleAppointment = async (id: string, target: { date: string; 
   try {
     await mongoose.connection.transaction(async (session) => {
       // Cancel first so the patient's "one active booking per doctor per day" rule allows the new one
-      cancelled = (await cancelAppointment(id, `Rescheduled to ${target.date}${target.slotTime ? " " + target.slotTime : ""}`, actor, { session })) as AppointmentDocument;
+      cancelled = (await cancelAppointment(
+        id,
+        `Rescheduled to ${target.date}${target.slotTime ? " " + target.slotTime : ""}`,
+        actor,
+        { session },
+      )) as AppointmentDocument;
       moved = await bookWithinSession(input, actor, session, { rescheduledFrom: cancelled._id });
       cancelled.rescheduledTo = moved._id;
       await cancelled.save({ session });
@@ -367,10 +459,33 @@ export const rescheduleAppointment = async (id: string, target: { date: string; 
     await translateDuplicate(err, input);
   }
 
-  await finishChange(cancelled, original.status, actor, "UPDATE", { rescheduledTo: String(moved._id) });
+  // One "rescheduled" event instead of "cancelled" + "booked", so automation does not tell the patient it was cancelled
+  await finishChange(
+    cancelled,
+    original.status,
+    actor,
+    "UPDATE",
+    { rescheduledTo: String(moved._id) },
+    { publishEvent: false },
+  );
   const result = await view(moved);
-  await recordAudit({ req: actor.req, action: "CREATE", entityType: "Appointment", entityId: moved._id, after: { serialNo: result.serialNo, date: result.date, slotTime: result.slotTime }, meta: { rescheduledFrom: id } });
+  await recordAudit({
+    req: actor.req,
+    action: "CREATE",
+    entityType: "Appointment",
+    entityId: moved._id,
+    after: { serialNo: result.serialNo, date: result.date, slotTime: result.slotTime },
+    meta: { rescheduledFrom: id },
+  });
   notifyAppointmentChanged(result);
+  void publish("appointment.rescheduled", {
+    fromAppointmentId: id,
+    toAppointmentId: result.id,
+    patientId: result.patient.id,
+    doctorId: result.doctor.id,
+    date: result.date,
+    slotTime: result.slotTime,
+  });
   return result;
 };
 
@@ -394,7 +509,8 @@ export const listAppointments = async (f: ListFilters) => {
   if (f.doctorId) filter.doctor = f.doctorId;
   if (f.restrictToDoctorId !== undefined) {
     if (f.restrictToDoctorId === null) return { items: [], pagination: buildPagination(f.page, f.limit, 0) };
-    if (f.doctorId && f.doctorId !== f.restrictToDoctorId) return { items: [], pagination: buildPagination(f.page, f.limit, 0) };
+    if (f.doctorId && f.doctorId !== f.restrictToDoctorId)
+      return { items: [], pagination: buildPagination(f.page, f.limit, 0) };
     filter.doctor = f.restrictToDoctorId;
   }
   if (f.status) filter.status = f.status;
@@ -403,7 +519,13 @@ export const listAppointments = async (f: ListFilters) => {
     // Search the patient by name, code or phone digits, then list their appointments
     const rx = new RegExp(escapeRegex(f.q), "i");
     const digits = f.q.replace(/\D/g, "");
-    const ids = await PatientModel.find({ $or: [{ name: rx }, { patientCode: rx }, ...(digits.length >= 4 ? [{ phone: new RegExp(escapeRegex(digits)) }] : [])] })
+    const ids = await PatientModel.find({
+      $or: [
+        { name: rx },
+        { patientCode: rx },
+        ...(digits.length >= 4 ? [{ phone: new RegExp(escapeRegex(digits)) }] : []),
+      ],
+    })
       .limit(200)
       .distinct("_id");
     filter.patient = { $in: ids };

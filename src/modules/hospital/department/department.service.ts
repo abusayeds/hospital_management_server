@@ -7,7 +7,14 @@ import { recordAudit } from "../../audit/audit.service";
 import { DoctorModel } from "../doctor/doctor.model";
 import { DepartmentModel } from "./department.model";
 
-type DepartmentInput = Partial<{ name: string; nameBn: string; description: string; icon: string; displayOrder: number; isActive: boolean }>;
+type DepartmentInput = Partial<{
+  name: string;
+  nameBn: string;
+  description: string;
+  icon: string;
+  displayOrder: number;
+  isActive: boolean;
+}>;
 
 const findOrThrow = async (id: string) => {
   const doc = await DepartmentModel.findById(id);
@@ -31,7 +38,9 @@ export const listDepartments = async ({ status }: { status?: "active" | "inactiv
 
 export const createDepartment = async (req: Request, input: DepartmentInput) => {
   if (await DepartmentModel.exists({ name: new RegExp(`^${escapeRegex(input.name ?? "")}$`, "i") })) {
-    throw new AppError(409, "A department with this name already exists.", "DUPLICATE_KEY", [{ path: "body.name", message: "already exists" }]);
+    throw new AppError(409, "A department with this name already exists.", "DUPLICATE_KEY", [
+      { path: "body.name", message: "already exists" },
+    ]);
   }
   const doc = await DepartmentModel.create({ ...input, createdBy: req.user!.id });
   await recordAudit({ req, action: "CREATE", entityType: "Department", entityId: doc._id, after: serialize(doc) });
@@ -43,7 +52,14 @@ export const updateDepartment = async (req: Request, id: string, input: Departme
   const before = serialize(doc);
   doc.set({ ...input, updatedBy: req.user!.id });
   await doc.save();
-  await recordAudit({ req, action: "UPDATE", entityType: "Department", entityId: doc._id, before, after: serialize(doc) });
+  await recordAudit({
+    req,
+    action: "UPDATE",
+    entityType: "Department",
+    entityId: doc._id,
+    before,
+    after: serialize(doc),
+  });
   return serialize(doc);
 };
 

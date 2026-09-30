@@ -23,9 +23,14 @@ const updateSettingsSchema = z.object({
       openingHoursBn: z.string().trim().max(120),
       logoUrl: z.string().trim().url().or(z.literal("")),
       bookingWindowDays: z.number().int().min(1).max(90),
-      cancellationCutoffMinutes: z.number().int().min(0).max(24 * 60),
+      cancellationCutoffMinutes: z
+        .number()
+        .int()
+        .min(0)
+        .max(24 * 60),
       defaultSlotMinutes: z.number().int().min(5).max(120),
       displayNotice: z.string().trim().max(300),
+      labFourEyes: z.boolean(),
     })
     .partial(),
 });
@@ -45,7 +50,12 @@ SettingsRoutes.patch(
   requirePermission("settings:manage"),
   validateRequest(updateSettingsSchema),
   catchAsync(async (req: Request, res: Response) => {
-    sendResponse(res, { statusCode: 200, success: true, message: "Settings saved", data: await updateSettings(req, req.body) });
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Settings saved",
+      data: await updateSettings(req, req.body),
+    });
   }),
 );
 
@@ -54,6 +64,11 @@ export const PublicRoutes = express.Router();
 PublicRoutes.get(
   "/hospital-info",
   catchAsync(async (_req: Request, res: Response) => {
-    sendResponse(res, { statusCode: 200, success: true, message: "Hospital info", data: await getPublicHospitalInfo() });
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Hospital info",
+      data: await getPublicHospitalInfo(),
+    });
   }),
 );

@@ -57,7 +57,10 @@ export const initSocketIO = (server: HttpServer): SocketIOServer => {
       permissions.forEach((p) => socket.join(`perm:${p}`));
     }
     if (socket.data.doctorId) socket.join(`doctor:${socket.data.doctorId}`);
-    logger.debug({ socketId: socket.id, authenticated: Boolean(socket.data.userId), display: Boolean(socket.data.display) }, "Socket connected");
+    logger.debug(
+      { socketId: socket.id, authenticated: Boolean(socket.data.userId), display: Boolean(socket.data.display) },
+      "Socket connected",
+    );
     socket.on("disconnect", (reason) => logger.debug({ socketId: socket.id, reason }, "Socket disconnected"));
   });
 

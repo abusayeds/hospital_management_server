@@ -77,7 +77,21 @@ LabTestSchema.plugin(basePlugin);
 export const LabTestModel = mongoose.models.LabTest || mongoose.model<ILabTest>("LabTest", LabTestSchema);
 
 // ------------------------------------------------------------------ Medicine (catalog only)
-export const MEDICINE_FORMS = ["tablet", "capsule", "syrup", "suspension", "injection", "drops", "cream", "ointment", "inhaler", "suppository", "powder", "gel", "other"] as const;
+export const MEDICINE_FORMS = [
+  "tablet",
+  "capsule",
+  "syrup",
+  "suspension",
+  "injection",
+  "drops",
+  "cream",
+  "ointment",
+  "inhaler",
+  "suppository",
+  "powder",
+  "gel",
+  "other",
+] as const;
 
 export interface IMedicine extends IBaseFields {
   genericName: string;

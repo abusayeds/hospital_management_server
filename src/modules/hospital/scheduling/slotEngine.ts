@@ -79,7 +79,15 @@ export const slotTimesOf = (session: ScheduleSession): string[] => {
 
 export const computeDaySlots = ({ date, sessions, leaves, bookings, nowMinutes = null }: SlotEngineInput): DaySlots => {
   const leave = findLeave(leaves, date);
-  const empty: DaySlots = { date, onLeave: Boolean(leave), leaveReason: leave?.reason, sessions: [], slots: [], availableCount: 0, nextAvailable: null };
+  const empty: DaySlots = {
+    date,
+    onLeave: Boolean(leave),
+    leaveReason: leave?.reason,
+    sessions: [],
+    slots: [],
+    availableCount: 0,
+    nextAvailable: null,
+  };
   if (leave) return empty;
 
   const day = weekdayOf(date);
@@ -122,7 +130,13 @@ export const computeDaySlots = ({ date, sessions, leaves, bookings, nowMinutes =
   }
 
   const available = slots.filter((s) => s.available);
-  return { ...empty, sessions: summaries, slots, availableCount: available.length, nextAvailable: available[0] ?? null };
+  return {
+    ...empty,
+    sessions: summaries,
+    slots,
+    availableCount: available.length,
+    nextAvailable: available[0] ?? null,
+  };
 };
 
 /**

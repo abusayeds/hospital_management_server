@@ -28,6 +28,8 @@ export const PERMISSIONS = {
   "patient:create": "Register new patients",
   "patient:read_basic": "Search patients and see basic details",
   "patient:read_full": "See the full medical record (EMR)",
+  // Clinicians normally open only patients who have an appointment with them (object-level rule)
+  "emr:read_all": "Open the medical record of ANY patient, not only own patients",
   "patient:update": "Edit patient demographic details",
   // Appointments & queue (Phase 4)
   "appointment:create": "Book appointments",
@@ -51,6 +53,8 @@ export const PERMISSIONS = {
   "lab_report:upload": "Upload lab report files",
   "lab_report:verify": "Verify and release lab reports",
   "lab_report:read": "Read lab reports",
+  "lab_report:deliver": "Print and hand over verified lab reports",
+  "ai_summary:use": "Generate the AI visit summary (a draft to verify, never saved automatically)",
   // Pharmacy (Phase 8)
   "dispense:create": "Dispense medicines",
   "stock:read": "See medicine stock",
@@ -114,8 +118,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "bill:read",
     "bill:collect",
     "assistant_chat:manage",
+    "lab_order:read",
+    "lab_report:deliver",
   ],
-  // Full EMR of their own patients (object-level check in Phase 5). No billing.
+  // Full EMR of THEIR OWN patients (patients with an appointment with them — checked in the API). No billing.
   doctor: [
     "dashboard:read",
     "patient:read_basic",
@@ -131,6 +137,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "prescription:read",
     "lab_order:create",
     "lab_report:read",
+    "ai_summary:use",
   ],
   // Vitals and today's waiting list. No prescriptions.
   nurse: [
@@ -142,14 +149,17 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "vitals:create",
     "vitals:read",
   ],
-  // Results and report upload. Verification is a separate permission (senior staff).
+  // Results, verification and delivery. Four-eyes rule: the person who entered the
+  // results can never verify them (enforced in the lab service; see hospital settings).
   lab_technician: [
     "dashboard:read",
     "patient:read_basic",
     "lab_order:read",
     "lab_result:create",
     "lab_report:upload",
+    "lab_report:verify",
     "lab_report:read",
+    "lab_report:deliver",
   ],
   // Medication part only. No diagnosis or lab reports.
   pharmacist: [

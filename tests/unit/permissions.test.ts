@@ -1,5 +1,5 @@
 import fs from "fs";
-import { buildFrontendCopy, TARGET } from "../../scripts/export-permissions";
+import { buildCopy, normalizeEol, SHARED_FILES } from "../../scripts/export-permissions";
 import { PERMISSIONS, ROLE_PERMISSIONS, ROLES, roleHasPermission } from "../../src/config/permissions";
 
 describe("permission map", () => {
@@ -14,7 +14,7 @@ describe("permission map", () => {
     }
   });
 
-  // Least privilege spot checks — these mirror the rules in PROJECT_CONTEXT.md
+  // Least privilege spot checks — these mirror the rules in backend/README.md §7
   it.each([
     ["reception", "prescription:create"],
     ["reception", "patient:read_full"],
@@ -26,7 +26,10 @@ describe("permission map", () => {
     ["accounts", "visit:read"],
     ["management", "visit:create"],
     ["management", "patient:update"],
-    ["lab_technician", "lab_report:verify"],
+    ["reception", "lab_result:create"],
+    ["reception", "lab_report:verify"],
+    ["doctor", "emr:read_all"],
+    ["nurse", "visit:read"],
     ["super_admin", "patient:read_full"],
     ["patient", "patient:read_basic"],
     ["patient", "user:manage"],
@@ -41,7 +44,10 @@ describe("permission map", () => {
     }
   });
 
-  it("frontend copy is in sync (run `npm run permissions:export` if this fails)", () => {
-    expect(fs.readFileSync(TARGET, "utf8")).toBe(buildFrontendCopy());
-  });
+  it.each(SHARED_FILES.map((f) => [f.label, f] as const))(
+    "frontend copy of %s is in sync (run `npm run shared:export` if this fails)",
+    (_label, file) => {
+      expect(normalizeEol(fs.readFileSync(file.target, "utf8"))).toBe(buildCopy(file));
+    },
+  );
 });

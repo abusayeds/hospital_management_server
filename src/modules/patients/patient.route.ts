@@ -34,11 +34,15 @@ const patientBody = z.object({
   ageYears: z.number().int().min(0).max(120).optional(),
   phone: bdPhoneSchema,
   altPhone: optionalPhone.optional(),
-  address: z.object({ area: shortText(150).optional(), upazila: shortText(60).optional(), district: shortText(60).optional() }).optional(),
+  address: z
+    .object({ area: shortText(150).optional(), upazila: shortText(60).optional(), district: shortText(60).optional() })
+    .optional(),
   bloodGroup: z.enum(BLOOD_GROUPS).or(z.literal("")).optional(),
   allergies: z.array(shortText(60)).max(20).optional(),
   chronicConditions: z.array(shortText(80)).max(20).optional(),
-  emergencyContact: z.object({ name: shortText(100).optional(), phone: optionalPhone.optional(), relation: shortText(40).optional() }).optional(),
+  emergencyContact: z
+    .object({ name: shortText(100).optional(), phone: optionalPhone.optional(), relation: shortText(40).optional() })
+    .optional(),
   // Bangladesh NID: 10, 13 or 17 digits
   nid: z
     .string()
@@ -66,27 +70,53 @@ const historySchema = z.object({ params: idParams, query: z.object({ ...paginati
 const list = catchAsync(async (req: Request, res: Response) => {
   const { items, pagination } = await patientService.searchPatients(req.query as never);
   const view = patientService.viewFor(req.user!.role);
-  sendResponse(res, { statusCode: 200, success: true, message: "Patients", data: items.map((p) => patientService.serializePatient(p, view)), pagination });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Patients",
+    data: items.map((p) => patientService.serializePatient(p, view)),
+    pagination,
+  });
 });
 
 const create = catchAsync(async (req: Request, res: Response) => {
   const { allowDuplicate, ...input } = req.body;
   const doc = await patientService.createPatient(input, { req, allowDuplicate });
-  sendResponse(res, { statusCode: 201, success: true, message: "Patient registered", data: patientService.serializePatient(doc, patientService.viewFor(req.user!.role)) });
+  sendResponse(res, {
+    statusCode: 201,
+    success: true,
+    message: "Patient registered",
+    data: patientService.serializePatient(doc, patientService.viewFor(req.user!.role)),
+  });
 });
 
 const get = catchAsync(async (req: Request, res: Response) => {
-  sendResponse(res, { statusCode: 200, success: true, message: "Patient", data: await patientService.getPatientForView(req, req.params.id) });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Patient",
+    data: await patientService.getPatientForView(req, req.params.id),
+  });
 });
 
 const update = catchAsync(async (req: Request, res: Response) => {
-  sendResponse(res, { statusCode: 200, success: true, message: "Patient updated", data: await patientService.updatePatient(req, req.params.id, req.body) });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Patient updated",
+    data: await patientService.updatePatient(req, req.params.id, req.body),
+  });
 });
 
 // A doctor only sees this patient's appointments with THEM (same rule as /appointments)
 const appointments = catchAsync(async (req: Request, res: Response) => {
   const { page, limit } = req.query as unknown as { page: number; limit: number };
-  const { items, pagination } = await appointmentService.listAppointments({ patientId: req.params.id, page, limit, restrictToDoctorId: await ownDoctorScope(req) });
+  const { items, pagination } = await appointmentService.listAppointments({
+    patientId: req.params.id,
+    page,
+    limit,
+    restrictToDoctorId: await ownDoctorScope(req),
+  });
   sendResponse(res, { statusCode: 200, success: true, message: "Patient appointments", data: items, pagination });
 });
 

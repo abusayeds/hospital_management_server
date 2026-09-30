@@ -12,6 +12,12 @@ import { DoctorRoutes } from "../modules/hospital/doctor/doctor.route";
 import { DisplayRoutes, QueueRoutes } from "../modules/hospital/queue/queue.route";
 import { PatientRoutes } from "../modules/patients/patient.route";
 import { UserRoutes } from "../modules/users/user.route";
+import { EventRoutes } from "../events/events.route";
+import { VitalsRoutes } from "../modules/clinical/vitals/vitals.route";
+import { VisitRoutes } from "../modules/clinical/visits/visit.route";
+import { LabRoutes } from "../modules/clinical/lab/lab.route";
+import { AiSummaryRoutes } from "../modules/clinical/ai-summary/aiSummary.route";
+import { VerifyRoutes } from "../documents/verify.route";
 import { HealthRoutes } from "./health.route";
 
 // Mounted at /api/v1 in app.ts. A future /api/v2 can live beside it.
@@ -22,6 +28,7 @@ const moduleRoutes: { path: string; route: express.Router }[] = [
   { path: "/auth", route: AuthRoutes },
   { path: "/users", route: UserRoutes },
   { path: "/audit-logs", route: AuditRoutes },
+  { path: "/events", route: EventRoutes },
   { path: "/management", route: managementRoutes },
   { path: "/departments", route: DepartmentRoutes },
   { path: "/doctors", route: DoctorRoutes },
@@ -29,9 +36,19 @@ const moduleRoutes: { path: string; route: express.Router }[] = [
   { path: "/lab-tests", route: labTestCatalog.router },
   { path: "/medicines", route: medicineCatalog.router },
   { path: "/settings", route: SettingsRoutes },
+  { path: "/public/verify", route: VerifyRoutes },
   { path: "/public", route: PublicRoutes },
   { path: "/patients", route: PatientRoutes },
+  { path: "/patients", route: VitalsRoutes.patientRouter },
+  { path: "/patients", route: VisitRoutes.patientRouter },
+  { path: "/patients", route: LabRoutes.patientRouter },
+  { path: "/patients", route: AiSummaryRoutes },
   { path: "/appointments", route: AppointmentRoutes },
+  { path: "/appointments", route: VitalsRoutes.appointmentRouter },
+  { path: "/appointments", route: VisitRoutes.appointmentRouter },
+  { path: "/visits", route: VisitRoutes.visitRouter },
+  { path: "/lab-orders", route: LabRoutes.router },
+  { path: "/vitals", route: VitalsRoutes.vitalsRouter },
   { path: "/queue", route: QueueRoutes },
   { path: "/display", route: DisplayRoutes },
   { path: "/dashboard", route: DashboardRoutes },

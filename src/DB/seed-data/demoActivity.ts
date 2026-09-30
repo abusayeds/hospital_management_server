@@ -32,32 +32,196 @@ const between = (min: number, max: number) => min + Math.floor(rng() * (max - mi
 
 // ---------------------------------------------------------------- names (English → Bangla)
 const BN: Record<string, string> = {
-  Md: "মো.", Abdul: "আব্দুল", Rahim: "রহিম", Karim: "করিম", Jamal: "জামাল", Kamal: "কামাল", Rafiq: "রফিক", Habib: "হাবিব", Nasir: "নাসির",
-  Mizanur: "মিজানুর", Anisur: "আনিসুর", Faruk: "ফারুক", Shahidul: "শহিদুল", Monir: "মনির", Tareq: "তারেক", Sabbir: "সাব্বির", Rakib: "রাকিব",
-  Imran: "ইমরান", Sohel: "সোহেল", Babul: "বাবুল", Jahid: "জাহিদ", Masud: "মাসুদ", Rashed: "রাশেদ", Fahim: "ফাহিম", Nayeem: "নাঈম", Riyad: "রিয়াদ",
-  Shakil: "শাকিল", Gopal: "গোপাল", Sujon: "সুজন", Pradip: "প্রদীপ", Biplob: "বিপ্লব", Fatema: "ফাতেমা", Ayesha: "আয়েশা", Nasrin: "নাসরিন",
-  Shirin: "শিরিন", Rokeya: "রোকেয়া", Salma: "সালমা", Rehana: "রেহানা", Parvin: "পারভীন", Jesmin: "জেসমিন", Sharmin: "শারমিন", Taslima: "তাসলিমা",
-  Sumaiya: "সুমাইয়া", Tahmina: "তাহমিনা", Rumana: "রুমানা", Farzana: "ফারজানা", Shapla: "শাপলা", Moriom: "মরিয়ম", Hasina: "হাসিনা", Kulsum: "কুলসুম",
-  Rabeya: "রাবেয়া", Jannatul: "জান্নাতুল", Mim: "মিম", Rina: "রিনা", Mitu: "মিতু", Shikha: "শিখা", Hossain: "হোসেন", Rahman: "রহমান", Islam: "ইসলাম",
-  Ahmed: "আহমেদ", Uddin: "উদ্দিন", Mia: "মিয়া", Sarkar: "সরকার", Chowdhury: "চৌধুরী", Talukder: "তালুকদার", Mollah: "মোল্লা", Sheikh: "শেখ",
-  Bhuiyan: "ভূঁইয়া", Akter: "আক্তার", Begum: "বেগম", Khatun: "খাতুন", Das: "দাস", Saha: "সাহা", Roy: "রায়", Paul: "পাল", Ferdous: "ফেরদৌস",
+  Md: "মো.",
+  Abdul: "আব্দুল",
+  Rahim: "রহিম",
+  Karim: "করিম",
+  Jamal: "জামাল",
+  Kamal: "কামাল",
+  Rafiq: "রফিক",
+  Habib: "হাবিব",
+  Nasir: "নাসির",
+  Mizanur: "মিজানুর",
+  Anisur: "আনিসুর",
+  Faruk: "ফারুক",
+  Shahidul: "শহিদুল",
+  Monir: "মনির",
+  Tareq: "তারেক",
+  Sabbir: "সাব্বির",
+  Rakib: "রাকিব",
+  Imran: "ইমরান",
+  Sohel: "সোহেল",
+  Babul: "বাবুল",
+  Jahid: "জাহিদ",
+  Masud: "মাসুদ",
+  Rashed: "রাশেদ",
+  Fahim: "ফাহিম",
+  Nayeem: "নাঈম",
+  Riyad: "রিয়াদ",
+  Shakil: "শাকিল",
+  Gopal: "গোপাল",
+  Sujon: "সুজন",
+  Pradip: "প্রদীপ",
+  Biplob: "বিপ্লব",
+  Fatema: "ফাতেমা",
+  Ayesha: "আয়েশা",
+  Nasrin: "নাসরিন",
+  Shirin: "শিরিন",
+  Rokeya: "রোকেয়া",
+  Salma: "সালমা",
+  Rehana: "রেহানা",
+  Parvin: "পারভীন",
+  Jesmin: "জেসমিন",
+  Sharmin: "শারমিন",
+  Taslima: "তাসলিমা",
+  Sumaiya: "সুমাইয়া",
+  Tahmina: "তাহমিনা",
+  Rumana: "রুমানা",
+  Farzana: "ফারজানা",
+  Shapla: "শাপলা",
+  Moriom: "মরিয়ম",
+  Hasina: "হাসিনা",
+  Kulsum: "কুলসুম",
+  Rabeya: "রাবেয়া",
+  Jannatul: "জান্নাতুল",
+  Mim: "মিম",
+  Rina: "রিনা",
+  Mitu: "মিতু",
+  Shikha: "শিখা",
+  Hossain: "হোসেন",
+  Rahman: "রহমান",
+  Islam: "ইসলাম",
+  Ahmed: "আহমেদ",
+  Uddin: "উদ্দিন",
+  Mia: "মিয়া",
+  Sarkar: "সরকার",
+  Chowdhury: "চৌধুরী",
+  Talukder: "তালুকদার",
+  Mollah: "মোল্লা",
+  Sheikh: "শেখ",
+  Bhuiyan: "ভূঁইয়া",
+  Akter: "আক্তার",
+  Begum: "বেগম",
+  Khatun: "খাতুন",
+  Das: "দাস",
+  Saha: "সাহা",
+  Roy: "রায়",
+  Paul: "পাল",
+  Ferdous: "ফেরদৌস",
 };
-const MALE = ["Abdul", "Rahim", "Karim", "Jamal", "Kamal", "Rafiq", "Habib", "Nasir", "Mizanur", "Anisur", "Faruk", "Shahidul", "Monir", "Tareq", "Sabbir", "Rakib", "Imran", "Sohel", "Babul", "Jahid", "Masud", "Rashed", "Fahim", "Nayeem", "Riyad", "Shakil"];
-const FEMALE = ["Fatema", "Ayesha", "Nasrin", "Shirin", "Rokeya", "Salma", "Rehana", "Parvin", "Jesmin", "Sharmin", "Taslima", "Sumaiya", "Tahmina", "Rumana", "Farzana", "Shapla", "Moriom", "Hasina", "Kulsum", "Rabeya", "Jannatul", "Mim"];
-const SURNAMES = ["Hossain", "Rahman", "Islam", "Ahmed", "Uddin", "Mia", "Sarkar", "Chowdhury", "Talukder", "Mollah", "Sheikh", "Bhuiyan", "Ferdous"];
+const MALE = [
+  "Abdul",
+  "Rahim",
+  "Karim",
+  "Jamal",
+  "Kamal",
+  "Rafiq",
+  "Habib",
+  "Nasir",
+  "Mizanur",
+  "Anisur",
+  "Faruk",
+  "Shahidul",
+  "Monir",
+  "Tareq",
+  "Sabbir",
+  "Rakib",
+  "Imran",
+  "Sohel",
+  "Babul",
+  "Jahid",
+  "Masud",
+  "Rashed",
+  "Fahim",
+  "Nayeem",
+  "Riyad",
+  "Shakil",
+];
+const FEMALE = [
+  "Fatema",
+  "Ayesha",
+  "Nasrin",
+  "Shirin",
+  "Rokeya",
+  "Salma",
+  "Rehana",
+  "Parvin",
+  "Jesmin",
+  "Sharmin",
+  "Taslima",
+  "Sumaiya",
+  "Tahmina",
+  "Rumana",
+  "Farzana",
+  "Shapla",
+  "Moriom",
+  "Hasina",
+  "Kulsum",
+  "Rabeya",
+  "Jannatul",
+  "Mim",
+];
+const SURNAMES = [
+  "Hossain",
+  "Rahman",
+  "Islam",
+  "Ahmed",
+  "Uddin",
+  "Mia",
+  "Sarkar",
+  "Chowdhury",
+  "Talukder",
+  "Mollah",
+  "Sheikh",
+  "Bhuiyan",
+  "Ferdous",
+];
 const FEMALE_SURNAMES = ["Akter", "Begum", "Khatun", "Islam", "Rahman", "Chowdhury", "Ferdous"];
-const HINDU = { male: ["Gopal", "Sujon", "Pradip", "Biplob"], female: ["Rina", "Mitu", "Shikha"], surnames: ["Das", "Saha", "Roy", "Paul"] };
-const AREAS = ["Arshinagar", "Amtola", "Aganagar", "Zinzira", "Kalindi", "Hasnabad", "Kholamora", "Shubhadya", "Ruhitpur", "Konda", "Tegharia"];
+const HINDU = {
+  male: ["Gopal", "Sujon", "Pradip", "Biplob"],
+  female: ["Rina", "Mitu", "Shikha"],
+  surnames: ["Das", "Saha", "Roy", "Paul"],
+};
+const AREAS = [
+  "Arshinagar",
+  "Amtola",
+  "Aganagar",
+  "Zinzira",
+  "Kalindi",
+  "Hasnabad",
+  "Kholamora",
+  "Shubhadya",
+  "Ruhitpur",
+  "Konda",
+  "Tegharia",
+];
 const ALLERGIES = ["Penicillin", "Sulfa drugs", "Aspirin", "Seafood", "Dust"];
 const CHRONIC = ["Diabetes", "Hypertension", "Asthma", "Hypothyroidism", "IHD", "CKD"];
-const REASONS = ["Fever for 3 days", "Follow-up visit", "Headache", "Cough and cold", "Chest discomfort", "Back pain", "Skin rash", "Check-up", "Stomach pain", "Joint pain"];
+const REASONS = [
+  "Fever for 3 days",
+  "Follow-up visit",
+  "Headache",
+  "Cough and cold",
+  "Chest discomfort",
+  "Back pain",
+  "Skin rash",
+  "Check-up",
+  "Stomach pain",
+  "Joint pain",
+];
 
 const makeName = (gender: "male" | "female") => {
   if (chance(0.08)) return `${pick(gender === "male" ? HINDU.male : HINDU.female)} ${pick(HINDU.surnames)}`;
   if (gender === "male") return `${chance(0.3) ? "Md " : ""}${pick(MALE)} ${pick(SURNAMES)}`;
   return `${pick(FEMALE)} ${pick(FEMALE_SURNAMES)}`;
 };
-const toBangla = (name: string) => (name.split(" ").every((w) => BN[w]) ? name.split(" ").map((w) => BN[w]).join(" ") : undefined);
+const toBangla = (name: string) =>
+  name.split(" ").every((w) => BN[w])
+    ? name
+        .split(" ")
+        .map((w) => BN[w])
+        .join(" ")
+    : undefined;
 const makePhone = () => `+880${pick(["13", "15", "16", "17", "18", "19"])}${String(between(10000000, 99999999))}`;
 
 // ---------------------------------------------------------------- patients
@@ -88,9 +252,18 @@ const buildPatients = (count: number) => {
       address: { area: pick(AREAS), upazila: "Keraniganj", district: "Dhaka" },
       bloodGroup: chance(0.6) ? pick(["A+", "B+", "O+", "AB+", "A-", "B-", "O-"] as const) : undefined,
       allergies: chance(0.12) ? [pick(ALLERGIES)] : [],
-      chronicConditions: age > 35 && chance(0.35) ? [pick(CHRONIC), ...(chance(0.3) ? [pick(CHRONIC)] : [])].filter((c, j, a) => a.indexOf(c) === j) : [],
+      chronicConditions:
+        age > 35 && chance(0.35)
+          ? [pick(CHRONIC), ...(chance(0.3) ? [pick(CHRONIC)] : [])].filter((c, j, a) => a.indexOf(c) === j)
+          : [],
       registrationSource: chance(0.1) ? "chatbot" : chance(0.1) ? "phone" : "reception",
-      emergencyContact: chance(0.4) ? { name: makeName(chance(0.5) ? "male" : "female"), phone: makePhone(), relation: pick(["Son", "Daughter", "Wife", "Husband", "Brother", "Mother"]) } : undefined,
+      emergencyContact: chance(0.4)
+        ? {
+            name: makeName(chance(0.5) ? "male" : "female"),
+            phone: makePhone(),
+            relation: pick(["Son", "Daughter", "Wife", "Husband", "Brother", "Mother"]),
+          }
+        : undefined,
     });
   }
   return rows;
@@ -100,7 +273,8 @@ const buildPatients = (count: number) => {
 
 type Ctx = { patients: any[]; lastSeen: Map<string, string>; rows: any[]; counters: Map<string, number> };
 
-const at = (date: string, time: string, plusMinutes = 0) => new Date(new Date(`${date}T${time}:00+06:00`).getTime() + plusMinutes * 60000);
+const at = (date: string, time: string, plusMinutes = 0) =>
+  new Date(new Date(`${date}T${time}:00+06:00`).getTime() + plusMinutes * 60000);
 
 /** One doctor, one day: choose patients, assign slots and serials, set a realistic status */
 const bookDay = (doctor: any, date: string, ctx: Ctx, mode: "past" | "today" | "future") => {
@@ -113,7 +287,10 @@ const bookDay = (doctor: any, date: string, ctx: Ctx, mode: "past" | "today" | "
     const key = sessionKeyOf(session);
     const times = slotTimesOf(session);
     const capacity = Math.min(session.maxPatients, times.length);
-    const count = mode === "future" ? between(1, Math.ceil(capacity * 0.35)) : between(Math.ceil(capacity * 0.35), Math.ceil(capacity * 0.8));
+    const count =
+      mode === "future"
+        ? between(1, Math.ceil(capacity * 0.35))
+        : between(Math.ceil(capacity * 0.35), Math.ceil(capacity * 0.8));
     const chosenTimes = times.slice(0, count);
     const started = toMinutes(session.startTime) <= now;
     const ended = toMinutes(session.endTime) <= now;
@@ -159,7 +336,11 @@ const bookDay = (doctor: any, date: string, ctx: Ctx, mode: "past" | "today" | "
         feeSnapshot: followUp ? doctor.followUpFee : doctor.consultationFee,
         source: chance(0.15) ? "chatbot" : chance(0.15) ? "walk_in" : chance(0.1) ? "phone" : "reception",
         status,
-        priority: chance(0.06) ? "emergency" : patient.dateOfBirth && Number(date.slice(0, 4)) - patient.dateOfBirth.getUTCFullYear() >= 65 && chance(0.6) ? "elderly" : "normal",
+        priority: chance(0.06)
+          ? "emergency"
+          : patient.dateOfBirth && Number(date.slice(0, 4)) - patient.dateOfBirth.getUTCFullYear() >= 65 && chance(0.6)
+            ? "elderly"
+            : "normal",
         holdsSlot: ["booked", "checked_in", "in_consultation"].includes(status),
         notes: chance(0.3) ? pick(REASONS) : undefined,
       };
@@ -202,15 +383,24 @@ export const seedDemoActivity = async () => {
   const ctx: Ctx = { patients, lastSeen: new Map(), rows: [], counters: new Map() };
   for (let d = 30; d >= 1; d--) for (const doctor of doctors) bookDay(doctor, addDays(today, -d), ctx, "past");
   for (const doctor of doctors) bookDay(doctor, today, ctx, "today");
-  for (let d = 1; d <= 7; d++) for (const doctor of doctors) if (chance(0.7)) bookDay(doctor, addDays(today, d), ctx, "future");
+  for (let d = 1; d <= 7; d++)
+    for (const doctor of doctors) if (chance(0.7)) bookDay(doctor, addDays(today, d), ctx, "future");
 
   await AppointmentModel.insertMany(ctx.rows, { ordered: false });
   // Serial counters continue from the seeded bookings, so the next real booking gets the next number
   await CounterModel.bulkWrite(
-    [...ctx.counters].map(([id, seq]) => ({ updateOne: { filter: { _id: id }, update: { $max: { seq } }, upsert: true } })),
+    [...ctx.counters].map(([id, seq]) => ({
+      updateOne: { filter: { _id: id }, update: { $max: { seq } }, upsert: true },
+    })),
   );
   await PatientModel.bulkWrite(
-    patients.filter((p: any) => p.lastVisitDate).map((p: any) => ({ updateOne: { filter: { _id: p._id }, update: { $set: { lastVisitDate: p.lastVisitDate } } } })),
+    patients
+      .filter((p: any) => p.lastVisitDate)
+      .map((p: any) => ({
+        updateOne: { filter: { _id: p._id }, update: { $set: { lastVisitDate: p.lastVisitDate } } },
+      })),
   );
-  logger.info(`Demo activity: ${patients.length} patients, ${ctx.rows.length} appointments (30 days history, today, next 7 days)`);
+  logger.info(
+    `Demo activity: ${patients.length} patients, ${ctx.rows.length} appointments (30 days history, today, next 7 days)`,
+  );
 };

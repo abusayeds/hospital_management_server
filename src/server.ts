@@ -4,6 +4,8 @@ import http from "http";
 import app from "./app";
 import { connectDatabase, disconnectDatabase } from "./config/database";
 import { seedReferenceData } from "./DB";
+import { drainEvents } from "./events/bus";
+import { closePdfBrowser } from "./documents/pdf";
 import { closeSocketIO, initSocketIO } from "./sockets";
 import { logger } from "./utils/logger";
 
@@ -36,6 +38,8 @@ const shutdown = async (signal: string, exitCode = 0) => {
   try {
     await closeSocketIO();
     await new Promise<void>((resolve) => (server.listening ? server.close(() => resolve()) : resolve()));
+    await drainEvents(); // let pending domain events finish before the DB closes
+    await closePdfBrowser();
     await disconnectDatabase();
     logger.info("Shutdown complete");
   } catch (err) {

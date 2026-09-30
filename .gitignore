@@ -4,3 +4,9 @@ node_modules
 /logs
 /dist
 .env
+
+# Assistant / agent files never go to git (project knowledge lives in README.md)
+CLAUDE.md
+AGENTS.md
+.claude/
+.cursor/

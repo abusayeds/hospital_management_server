@@ -33,7 +33,9 @@ describe("Queue API", () => {
   const setup = async () => {
     const doctorUser = await createUser({ role: "doctor", email: "doc@test.local" });
     const { doctor } = await createClinic({ userId: doctorUser._id });
-    doctor.sessions = [{ dayOfWeek: weekdayOf(todayInDhaka()), startTime: "00:00", endTime: "23:50", slotMinutes: 10, maxPatients: 150 }];
+    doctor.sessions = [
+      { dayOfWeek: weekdayOf(todayInDhaka()), startTime: "00:00", endTime: "23:50", slotMinutes: 10, maxPatients: 150 },
+    ];
     await doctor.save();
     const patients = await createPatients(4);
     const date = todayInDhaka();
@@ -52,7 +54,12 @@ describe("Queue API", () => {
         holdsSlot: true,
         statusHistory: [{ status: "booked", at: new Date() }],
       });
-    const [s1, s2, s3, s4] = [await make(0, "in_consultation"), await make(1, "checked_in"), await make(2, "checked_in", "elderly"), await make(3, "booked")];
+    const [s1, s2, s3, s4] = [
+      await make(0, "in_consultation"),
+      await make(1, "checked_in"),
+      await make(2, "checked_in", "elderly"),
+      await make(3, "booked"),
+    ];
     return { doctor, patients, serial: { s1, s2, s3, s4 } };
   };
 

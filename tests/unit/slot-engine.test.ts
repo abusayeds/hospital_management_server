@@ -1,10 +1,34 @@
-import { computeDaySlots, ScheduleSession, sessionKeyOf, slotTimesOf, validateSessions } from "../../src/modules/hospital/scheduling/slotEngine";
+import {
+  computeDaySlots,
+  ScheduleSession,
+  sessionKeyOf,
+  slotTimesOf,
+  validateSessions,
+} from "../../src/modules/hospital/scheduling/slotEngine";
 
 // 2026-10-03 is a Saturday (dayOfWeek 6)
 const SAT = "2026-10-03";
-const morning: ScheduleSession = { dayOfWeek: 6, startTime: "09:00", endTime: "10:00", slotMinutes: 15, maxPatients: 10 };
-const evening: ScheduleSession = { dayOfWeek: 6, startTime: "17:00", endTime: "18:00", slotMinutes: 20, maxPatients: 2 };
-const mondayOnly: ScheduleSession = { dayOfWeek: 1, startTime: "09:00", endTime: "12:00", slotMinutes: 10, maxPatients: 10 };
+const morning: ScheduleSession = {
+  dayOfWeek: 6,
+  startTime: "09:00",
+  endTime: "10:00",
+  slotMinutes: 15,
+  maxPatients: 10,
+};
+const evening: ScheduleSession = {
+  dayOfWeek: 6,
+  startTime: "17:00",
+  endTime: "18:00",
+  slotMinutes: 20,
+  maxPatients: 2,
+};
+const mondayOnly: ScheduleSession = {
+  dayOfWeek: 1,
+  startTime: "09:00",
+  endTime: "12:00",
+  slotMinutes: 10,
+  maxPatients: 10,
+};
 
 describe("slot engine", () => {
   it("builds slots per session; the last slot must end by the session end", () => {

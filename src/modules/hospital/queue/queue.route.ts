@@ -24,7 +24,11 @@ const myDoctorId = async (req: Request) => {
  * may act on any doctor's queue where `allowFrontDesk` is set (recall, send back).
  * Viewers with queue:read who are not doctors (reception, nurse, management) may look.
  */
-const assertQueueAccess = async (req: Request, doctorId: string, { act, allowFrontDesk = false }: { act: boolean; allowFrontDesk?: boolean }) => {
+const assertQueueAccess = async (
+  req: Request,
+  doctorId: string,
+  { act, allowFrontDesk = false }: { act: boolean; allowFrontDesk?: boolean },
+) => {
   const role = req.user!.role;
   const isDoctor = roleHasPermission(role, "queue:call_next");
   if (!isDoctor) {
@@ -51,20 +55,40 @@ const today = catchAsync(async (req: Request, res: Response) => {
     if (!doctorId) throw new AppError(404, "Your login is not linked to a doctor profile yet. Ask the administrator.");
   }
   if (!doctorId) {
-    sendResponse(res, { statusCode: 200, success: true, message: "Today's board", data: await queueService.getTodayBoard() });
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Today's board",
+      data: await queueService.getTodayBoard(),
+    });
     return;
   }
   await assertQueueAccess(req, doctorId, { act: false });
-  sendResponse(res, { statusCode: 200, success: true, message: "Queue", data: await queueService.getDoctorQueue(doctorId) });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Queue",
+    data: await queueService.getDoctorQueue(doctorId),
+  });
 });
 
 const board = catchAsync(async (_req: Request, res: Response) => {
-  sendResponse(res, { statusCode: 200, success: true, message: "Today's board", data: await queueService.getTodayBoard() });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Today's board",
+    data: await queueService.getTodayBoard(),
+  });
 });
 
 const callNext = catchAsync(async (req: Request, res: Response) => {
   await assertQueueAccess(req, req.params.doctorId, { act: true });
-  sendResponse(res, { statusCode: 200, success: true, message: "Next patient called", data: await queueService.callNext(req.params.doctorId, actor(req)) });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Next patient called",
+    data: await queueService.callNext(req.params.doctorId, actor(req)),
+  });
 });
 
 const callSpecific = catchAsync(async (req: Request, res: Response) => {
@@ -75,7 +99,12 @@ const callSpecific = catchAsync(async (req: Request, res: Response) => {
 
 const recall = catchAsync(async (req: Request, res: Response) => {
   await assertQueueAccess(req, req.params.doctorId, { act: true, allowFrontDesk: true });
-  sendResponse(res, { statusCode: 200, success: true, message: "Announced again", data: await queueService.recall(req.params.doctorId, actor(req)) });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Announced again",
+    data: await queueService.recall(req.params.doctorId, actor(req)),
+  });
 });
 
 /** POST /appointments/:id/send-back — mounted on the appointments router */
@@ -92,8 +121,18 @@ router.use(authenticate());
 router.get("/today", requirePermission("queue:read"), validateRequest(todaySchema), today);
 router.get("/board", requirePermission("queue:read"), board);
 router.post("/:doctorId/call-next", requirePermission("queue:call_next"), validateRequest(doctorParams), callNext);
-router.post("/:doctorId/call/:appointmentId", requirePermission("queue:call_next"), validateRequest(callSpecificSchema), callSpecific);
-router.post("/:doctorId/recall", requireAnyPermission(["queue:call_next", "queue:manage"]), validateRequest(doctorParams), recall);
+router.post(
+  "/:doctorId/call/:appointmentId",
+  requirePermission("queue:call_next"),
+  validateRequest(callSpecificSchema),
+  callSpecific,
+);
+router.post(
+  "/:doctorId/recall",
+  requireAnyPermission(["queue:call_next", "queue:manage"]),
+  validateRequest(doctorParams),
+  recall,
+);
 export const QueueRoutes = router;
 
 // ---------------------------------------------------------------- routes (waiting-room TV, no login)

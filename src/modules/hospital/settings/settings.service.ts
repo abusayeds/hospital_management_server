@@ -4,7 +4,10 @@ import { serialize } from "../../../utils/serialize";
 import { recordAudit } from "../../audit/audit.service";
 import { HospitalSettingsModel, IHospitalSettings } from "./settings.model";
 
-export type HospitalSettings = Omit<IHospitalSettings, "key" | "isDeleted" | "createdBy" | "updatedBy" | "deletedAt" | "deletedBy">;
+export type HospitalSettings = Omit<
+  IHospitalSettings,
+  "key" | "isDeleted" | "createdBy" | "updatedBy" | "deletedAt" | "deletedBy"
+>;
 
 // First run: start from the values in .env so nothing is blank
 const defaults = (): HospitalSettings => ({
@@ -19,7 +22,9 @@ const defaults = (): HospitalSettings => ({
   bookingWindowDays: 14,
   cancellationCutoffMinutes: 60,
   defaultSlotMinutes: 10,
-  displayNotice: "অনুগ্রহ করে আপনার সিরিয়াল নম্বরের জন্য অপেক্ষা করুন · Please wait for your serial number to be called",
+  displayNotice:
+    "অনুগ্রহ করে আপনার সিরিয়াল নম্বরের জন্য অপেক্ষা করুন · Please wait for your serial number to be called",
+  labFourEyes: true,
 });
 
 // Settings are read on every booking; cache them in memory and drop the cache on update.

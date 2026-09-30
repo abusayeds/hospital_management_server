@@ -2,6 +2,7 @@ import { env } from "../config/env";
 import { logger } from "../utils/logger";
 import { removeLegacyUsers, seedDemoUsers } from "./demoUsers";
 import { linkDemoDoctor, seedHospitalData } from "./hospitalSeed";
+import { seedClinicalHistory } from "./seed-data/clinicalHistory";
 import { seedDemoActivity } from "./seed-data/demoActivity";
 
 // Runs on every server start: reference data the app needs (idempotent).
@@ -22,7 +23,11 @@ const seedDatabase = async () => {
     await linkDemoDoctor();
   }
   // Fictional patients and 30 days of appointments so dashboards and the TV look alive
-  if (env.NODE_ENV !== "production") await seedDemoActivity();
+  if (env.NODE_ENV !== "production") {
+    await seedDemoActivity();
+    // Visits, vitals, prescriptions and lab orders for the demo doctor (needs the demo accounts)
+    await seedClinicalHistory();
+  }
 };
 
 export default seedDatabase;

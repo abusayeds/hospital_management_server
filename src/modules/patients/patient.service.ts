@@ -47,7 +47,8 @@ export const namesLookAlike = (a: string, b: string): boolean => {
 // ------------------------------------------------------------------ date of birth
 
 /** Only an age was given → 1 July of that year (mid-year keeps the estimate within ±6 months) */
-export const estimateDob = (ageYears: number, today = todayInDhaka()): Date => new Date(Date.UTC(Number(today.slice(0, 4)) - ageYears, 6, 1));
+export const estimateDob = (ageYears: number, today = todayInDhaka()): Date =>
+  new Date(Date.UTC(Number(today.slice(0, 4)) - ageYears, 6, 1));
 
 // ------------------------------------------------------------------ serializers (per permission level)
 
@@ -165,14 +166,18 @@ const toFields = (input: Partial<PatientInput>) => {
     fields.dobEstimated = true;
   }
   if (input.phone !== undefined) fields.phone = normalizeBdPhone(input.phone);
-  if (input.altPhone !== undefined) fields.altPhone = input.altPhone ? normalizeBdPhone(input.altPhone, "altPhone") : undefined;
+  if (input.altPhone !== undefined)
+    fields.altPhone = input.altPhone ? normalizeBdPhone(input.altPhone, "altPhone") : undefined;
   if (input.address !== undefined) fields.address = input.address;
   if (input.bloodGroup !== undefined) fields.bloodGroup = input.bloodGroup || undefined;
   if (input.allergies !== undefined) fields.allergies = cleanList(input.allergies);
   if (input.chronicConditions !== undefined) fields.chronicConditions = cleanList(input.chronicConditions);
   if (input.emergencyContact !== undefined) {
     const ec = input.emergencyContact;
-    fields.emergencyContact = { ...ec, phone: ec.phone ? normalizeBdPhone(ec.phone, "emergencyContact.phone") : undefined };
+    fields.emergencyContact = {
+      ...ec,
+      phone: ec.phone ? normalizeBdPhone(ec.phone, "emergencyContact.phone") : undefined,
+    };
   }
   if (input.nid !== undefined) {
     const nid = input.nid.replace(/\s/g, "");
@@ -186,15 +191,22 @@ const toFields = (input: Partial<PatientInput>) => {
 /** Patients on the same phone whose name looks like `name` (family members with other names are fine) */
 export const findPossibleDuplicates = async (phone: string, name: string, session?: ClientSession) => {
   const key = normalizeName(name);
-  const samePhone = await PatientModel.find({ phone }).session(session ?? null).limit(20);
+  const samePhone = await PatientModel.find({ phone })
+    .session(session ?? null)
+    .limit(20);
   return samePhone.filter((p: any) => namesLookAlike(p.nameKey, key));
 };
 
 type Actor = { req?: Request; userId?: string | null };
 
-export const createPatient = async (input: PatientInput, { req, allowDuplicate = false, session }: Actor & { allowDuplicate?: boolean; session?: ClientSession }) => {
+export const createPatient = async (
+  input: PatientInput,
+  { req, allowDuplicate = false, session }: Actor & { allowDuplicate?: boolean; session?: ClientSession },
+) => {
   if (!input.dateOfBirth && input.ageYears === undefined) {
-    throw new AppError(400, "Enter the date of birth or the age.", "VALIDATION_ERROR", [{ path: "body.ageYears", message: "date of birth or age is required" }]);
+    throw new AppError(400, "Enter the date of birth or the age.", "VALIDATION_ERROR", [
+      { path: "body.ageYears", message: "date of birth or age is required" },
+    ]);
   }
   const fields = toFields(input);
 

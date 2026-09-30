@@ -23,4 +23,5 @@ DepartmentSchema.index({ displayOrder: 1, name: 1 });
 // timestamps, audit fields and soft delete (see models/plugins/basePlugin.ts)
 DepartmentSchema.plugin(basePlugin);
 
-export const DepartmentModel = mongoose.models.Department || mongoose.model<IDepartment>("Department", DepartmentSchema);
+export const DepartmentModel =
+  mongoose.models.Department || mongoose.model<IDepartment>("Department", DepartmentSchema);

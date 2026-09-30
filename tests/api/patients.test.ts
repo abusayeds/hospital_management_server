@@ -5,7 +5,15 @@ import { decryptField } from "../../src/utils/crypto";
 import { phoneSearchPrefix, toE164Bd } from "../../src/utils/phone";
 import { createUser, signIn, useTestDatabase } from "../helpers";
 
-const rahim = { name: "Md. Abdur Rahim", gender: "male", ageYears: 52, phone: "01711-222333", nid: "1990123456789", allergies: ["Penicillin"], chronicConditions: ["Diabetes"] };
+const rahim = {
+  name: "Md. Abdur Rahim",
+  gender: "male",
+  ageYears: 52,
+  phone: "01711-222333",
+  nid: "1990123456789",
+  allergies: ["Penicillin"],
+  chronicConditions: ["Diabetes"],
+};
 
 describe("phone and name helpers", () => {
   it("normalises every common spelling of a BD mobile to +880", () => {
@@ -42,7 +50,12 @@ describe("Patients API", () => {
     const agent = await receptionAgent();
     const res = await agent.post("/api/v1/patients").send(rahim);
     expect(res.status).toBe(201);
-    expect(res.body.data).toMatchObject({ patientCode: "TL-000001", phone: "+8801711222333", age: 52, dobEstimated: true });
+    expect(res.body.data).toMatchObject({
+      patientCode: "TL-000001",
+      phone: "+8801711222333",
+      age: 52,
+      dobEstimated: true,
+    });
     expect(res.body.data.nidMasked).toMatch(/6789$/);
     expect(JSON.stringify(res.body)).not.toContain("1990123456789");
     expect(JSON.stringify(res.body)).not.toContain("nidEncrypted");
@@ -56,12 +69,16 @@ describe("Patients API", () => {
     const agent = await receptionAgent();
     await agent.post("/api/v1/patients").send(rahim);
 
-    const dup = await agent.post("/api/v1/patients").send({ ...rahim, name: "Mohammad Abdur Rahim", phone: "+8801711222333" });
+    const dup = await agent
+      .post("/api/v1/patients")
+      .send({ ...rahim, name: "Mohammad Abdur Rahim", phone: "+8801711222333" });
     expect(dup.status).toBe(409);
     expect(dup.body.error.details.possibleDuplicates[0]).toMatchObject({ patientCode: "TL-000001" });
 
     // A family member on the same phone with a different name is NOT a duplicate
-    const wife = await agent.post("/api/v1/patients").send({ name: "Fatema Begum", gender: "female", ageYears: 47, phone: "01711222333" });
+    const wife = await agent
+      .post("/api/v1/patients")
+      .send({ name: "Fatema Begum", gender: "female", ageYears: 47, phone: "01711222333" });
     expect(wife.status).toBe(201);
 
     const forced = await agent.post("/api/v1/patients").send({ ...rahim, allowDuplicate: true });
@@ -72,8 +89,12 @@ describe("Patients API", () => {
   it("finds everyone sharing a phone, by code and by name", async () => {
     const agent = await receptionAgent();
     await agent.post("/api/v1/patients").send(rahim);
-    await agent.post("/api/v1/patients").send({ name: "Fatema Begum", gender: "female", ageYears: 47, phone: "01711222333" });
-    await agent.post("/api/v1/patients").send({ name: "Karim Mia", gender: "male", ageYears: 30, phone: "01811000111" });
+    await agent
+      .post("/api/v1/patients")
+      .send({ name: "Fatema Begum", gender: "female", ageYears: 47, phone: "01711222333" });
+    await agent
+      .post("/api/v1/patients")
+      .send({ name: "Karim Mia", gender: "male", ageYears: 30, phone: "01811000111" });
 
     expect((await agent.get("/api/v1/patients?q=01711")).body.data).toHaveLength(2);
     expect((await agent.get("/api/v1/patients?q=tl3")).body.data[0].name).toBe("Karim Mia");

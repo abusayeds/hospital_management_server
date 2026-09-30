@@ -5,7 +5,7 @@ import AppError from "../errors/AppError";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
- * CSRF defence for cookie-based auth (layer 3 of 3 — see PHASE_LOG):
+ * CSRF defence for cookie-based auth (layer 3 of 3 — see backend/README.md §6):
  *  1. cookies are sameSite=lax → browsers don't attach them to cross-site POSTs
  *  2. CORS allows only CLIENT_URL, and the API only accepts JSON bodies
  *  3. this check: a state-changing request that carries an Origin/Referer from

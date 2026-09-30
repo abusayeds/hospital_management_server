@@ -42,9 +42,18 @@ const listSchema = z.object({
   }),
 });
 const idSchema = z.object({ params: idParams });
-const checkInSchema = z.object({ params: idParams, body: z.object({ priority: z.enum(PRIORITIES).optional() }).default({}) });
-const cancelSchema = z.object({ params: idParams, body: z.object({ reason: z.string().trim().min(2, "Give a short reason").max(300) }) });
-const rescheduleSchema = z.object({ params: idParams, body: z.object({ date, slotTime: time.optional(), doctorId: objectIdSchema.optional() }) });
+const checkInSchema = z.object({
+  params: idParams,
+  body: z.object({ priority: z.enum(PRIORITIES).optional() }).default({}),
+});
+const cancelSchema = z.object({
+  params: idParams,
+  body: z.object({ reason: z.string().trim().min(2, "Give a short reason").max(300) }),
+});
+const rescheduleSchema = z.object({
+  params: idParams,
+  body: z.object({ date, slotTime: time.optional(), doctorId: objectIdSchema.optional() }),
+});
 
 // ---------------------------------------------------------------- object-level access
 /**
@@ -54,7 +63,8 @@ const rescheduleSchema = z.object({ params: idParams, body: z.object({ date, slo
  */
 export const ownDoctorScope = async (req: Request): Promise<string | null | undefined> => {
   const role = req.user!.role;
-  if (roleHasPermission(role, "appointment:update_status") || roleHasPermission(role, "report:operations")) return undefined;
+  if (roleHasPermission(role, "appointment:update_status") || roleHasPermission(role, "report:operations"))
+    return undefined;
   if (!roleHasPermission(role, "queue:call_next")) return undefined;
   const doctor = await findDoctorForUser(req.user!.id);
   return doctor ? String(doctor._id) : null;
@@ -65,31 +75,53 @@ const actor = (req: Request) => ({ req });
 
 const list = catchAsync(async (req: Request, res: Response) => {
   const restrictToDoctorId = await ownDoctorScope(req);
-  const { items, pagination } = await appointmentService.listAppointments({ ...(req.query as unknown as ListFilters), restrictToDoctorId });
+  const { items, pagination } = await appointmentService.listAppointments({
+    ...(req.query as unknown as ListFilters),
+    restrictToDoctorId,
+  });
   sendResponse(res, { statusCode: 200, success: true, message: "Appointments", data: items, pagination });
 });
 
 const get = catchAsync(async (req: Request, res: Response) => {
   const appt = await appointmentService.getAppointment(req.params.id);
   const scope = await ownDoctorScope(req);
-  if (scope !== undefined) await assertCanAccess(req, appt.doctor.id === scope, { entityType: "Appointment", entityId: appt.id });
+  if (scope !== undefined)
+    await assertCanAccess(req, appt.doctor.id === scope, { entityType: "Appointment", entityId: appt.id });
   sendResponse(res, { statusCode: 200, success: true, message: "Appointment", data: appt });
 });
 
 const create = catchAsync(async (req: Request, res: Response) => {
   const { checkInNow, ...body } = req.body;
-  const data = await appointmentService.bookAppointment({ ...body, checkInNow: checkInNow || body.source === "walk_in" }, actor(req));
+  const data = await appointmentService.bookAppointment(
+    { ...body, checkInNow: checkInNow || body.source === "walk_in" },
+    actor(req),
+  );
   sendResponse(res, { statusCode: 201, success: true, message: `Booked · serial ${data.serialNo}`, data });
 });
 
 const checkIn = catchAsync(async (req: Request, res: Response) => {
-  sendResponse(res, { statusCode: 200, success: true, message: "Checked in", data: await appointmentService.checkIn(req.params.id, actor(req), req.body.priority) });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Checked in",
+    data: await appointmentService.checkIn(req.params.id, actor(req), req.body.priority),
+  });
 });
 const cancel = catchAsync(async (req: Request, res: Response) => {
-  sendResponse(res, { statusCode: 200, success: true, message: "Cancelled", data: await appointmentService.cancelAppointment(req.params.id, req.body.reason, actor(req)) });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Cancelled",
+    data: await appointmentService.cancelAppointment(req.params.id, req.body.reason, actor(req)),
+  });
 });
 const noShow = catchAsync(async (req: Request, res: Response) => {
-  sendResponse(res, { statusCode: 200, success: true, message: "Marked as no-show", data: await appointmentService.markNoShow(req.params.id, actor(req)) });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Marked as no-show",
+    data: await appointmentService.markNoShow(req.params.id, actor(req)),
+  });
 });
 const reschedule = catchAsync(async (req: Request, res: Response) => {
   const data = await appointmentService.rescheduleAppointment(req.params.id, req.body, actor(req));
@@ -105,8 +137,18 @@ router.get("/:id", requirePermission("appointment:read"), validateRequest(idSche
 router.post("/:id/check-in", requirePermission("appointment:update_status"), validateRequest(checkInSchema), checkIn);
 router.post("/:id/cancel", requirePermission("appointment:update_status"), validateRequest(cancelSchema), cancel);
 router.post("/:id/no-show", requirePermission("appointment:update_status"), validateRequest(idSchema), noShow);
-router.post("/:id/reschedule", requirePermission("appointment:update_status"), validateRequest(rescheduleSchema), reschedule);
+router.post(
+  "/:id/reschedule",
+  requirePermission("appointment:update_status"),
+  validateRequest(rescheduleSchema),
+  reschedule,
+);
 // Patient stepped out of the consulting room → back to waiting (doctor for own queue, or front desk)
-router.post("/:id/send-back", requireAnyPermission(["queue:call_next", "queue:manage"]), validateRequest(idSchema), sendBackHandler);
+router.post(
+  "/:id/send-back",
+  requireAnyPermission(["queue:call_next", "queue:manage"]),
+  validateRequest(idSchema),
+  sendBackHandler,
+);
 
 export const AppointmentRoutes = router;

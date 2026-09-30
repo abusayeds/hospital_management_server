@@ -71,4 +71,5 @@ PatientSchema.index({ createdAt: -1 });
 PatientSchema.plugin(basePlugin);
 
 export const PatientModel =
-  mongoose.models.Patient || mongoose.model<IPatient, mongoose.Model<IPatient, object, IBaseMethods>>("Patient", PatientSchema);
+  mongoose.models.Patient ||
+  mongoose.model<IPatient, mongoose.Model<IPatient, object, IBaseMethods>>("Patient", PatientSchema);

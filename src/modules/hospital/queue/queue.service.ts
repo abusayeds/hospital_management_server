@@ -5,7 +5,7 @@ import { nowMinutesInDhaka, sessionLabel, todayInDhaka, toMinutes, weekdayOf } f
 import { recordAudit } from "../../audit/audit.service";
 import { AppointmentDocument, AppointmentModel, PRIORITY_RANK, Priority } from "../appointment/appointment.model";
 import { Actor, applyTransition, appointmentService, toAppointmentView } from "../appointment/appointment.service";
-import { notifyAppointmentChanged, notifyRecall } from "../appointment/appointment.events";
+import { notifyAppointmentChanged, notifyRecall, publishAppointmentStatus } from "../appointment/appointment.events";
 import { DoctorModel } from "../doctor/doctor.model";
 import { findLeave } from "../scheduling/slotEngine";
 
@@ -17,7 +17,10 @@ import { findLeave } from "../scheduling/slotEngine";
  * Booked patients who have not checked in are listed separately as "not arrived".
  * Estimated wait = position in the waiting line × the doctor's average minutes per patient.
  */
-export const compareQueue = (a: { status: string; priority: Priority; serialNo: number }, b: { status: string; priority: Priority; serialNo: number }) => {
+export const compareQueue = (
+  a: { status: string; priority: Priority; serialNo: number },
+  b: { status: string; priority: Priority; serialNo: number },
+) => {
   if (a.status === "in_consultation" && b.status !== "in_consultation") return -1;
   if (b.status === "in_consultation" && a.status !== "in_consultation") return 1;
   return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.serialNo - b.serialNo;
@@ -25,7 +28,9 @@ export const compareQueue = (a: { status: string; priority: Priority; serialNo: 
 
 const loadDoctor = async (doctorId: string, session?: ClientSession) => {
   if (!Types.ObjectId.isValid(doctorId)) throw new AppError(400, "Invalid doctor id.", "INVALID_ID");
-  const doctor = await DoctorModel.findById(doctorId).populate("department", "name nameBn").session(session ?? null);
+  const doctor = await DoctorModel.findById(doctorId)
+    .populate("department", "name nameBn")
+    .session(session ?? null);
   if (!doctor) throw new AppError(404, "Doctor not found.");
   return doctor;
 };
@@ -40,7 +45,11 @@ export const getDoctorQueue = async (doctorId: string, date = todayInDhaka()) =>
   const current = inLine.find((a) => a.status === "in_consultation") ?? null;
   const waiting = inLine
     .filter((a) => a.status === "checked_in")
-    .map((a, i) => ({ ...a, position: i + 1, estimatedWaitMinutes: (i + (current ? 1 : 0)) * doctor.averageMinutesPerPatient }));
+    .map((a, i) => ({
+      ...a,
+      position: i + 1,
+      estimatedWaitMinutes: (i + (current ? 1 : 0)) * doctor.averageMinutesPerPatient,
+    }));
   const notArrived = views.filter((a) => a.status === "booked").sort((a, b) => a.slotTime.localeCompare(b.slotTime));
   const count = (s: string) => views.filter((a) => a.status === s).length;
 
@@ -121,13 +130,37 @@ export const getTodayBoard = async () => {
 const today = () => todayInDhaka();
 
 const findCurrent = (doctorId: Types.ObjectId, session: ClientSession) =>
-  AppointmentModel.findOne({ doctor: doctorId, date: today(), status: "in_consultation" }).session(session) as Promise<AppointmentDocument | null>;
+  AppointmentModel.findOne({ doctor: doctorId, date: today(), status: "in_consultation" }).session(
+    session,
+  ) as Promise<AppointmentDocument | null>;
+
+/**
+ * The patient with the doctor may have an open medical record. Completing them from the queue
+ * would leave an unsigned visit behind, so the doctor must close (sign) the visit first.
+ */
+const assertNoOpenVisit = async (current: AppointmentDocument, session: ClientSession) => {
+  const open = await mongoose.model("Visit").exists({ appointment: current._id, status: "open" }).session(session);
+  if (open)
+    throw new AppError(
+      409,
+      `Serial ${current.serialNo} still has an open visit. Close the visit (or send the patient back) first.`,
+      "VISIT_OPEN",
+    );
+};
 
 const afterQueueChange = async (changed: AppointmentDocument[], actor: Actor, action: string) => {
   for (const appt of changed) {
     const v = toAppointmentView(await appt.populate(appointmentService.POPULATE));
-    await recordAudit({ req: actor.req, action: "UPDATE", entityType: "Appointment", entityId: appt._id, after: { status: appt.status }, meta: { queueAction: action, serialNo: appt.serialNo } });
+    await recordAudit({
+      req: actor.req,
+      action: "UPDATE",
+      entityType: "Appointment",
+      entityId: appt._id,
+      after: { status: appt.status },
+      meta: { queueAction: action, serialNo: appt.serialNo },
+    });
     notifyAppointmentChanged(v);
+    if (appt.status === "completed") publishAppointmentStatus(v, "in_consultation");
   }
 };
 
@@ -143,19 +176,25 @@ export const callNext = async (doctorId: string, actor: Actor) => {
     changed.length = 0;
     const current = await findCurrent(doctor._id, session);
     if (current) {
+      await assertNoOpenVisit(current, session);
       applyTransition(current, "completed", actor);
       await current.save({ session });
-      await mongoose.model("Patient").updateOne({ _id: current.patient }, { $set: { lastVisitDate: current.date } }, { session });
+      await mongoose
+        .model("Patient")
+        .updateOne({ _id: current.patient }, { $set: { lastVisitDate: current.date } }, { session });
       changed.push(current);
     }
-    const waiting = (await AppointmentModel.find({ doctor: doctor._id, date: today(), status: "checked_in" }).session(session)) as AppointmentDocument[];
+    const waiting = (await AppointmentModel.find({ doctor: doctor._id, date: today(), status: "checked_in" }).session(
+      session,
+    )) as AppointmentDocument[];
     const next = waiting.sort(compareQueue)[0];
     if (next) {
       applyTransition(next, "in_consultation", actor);
       await next.save({ session });
       changed.push(next);
     }
-    if (!current && !next) throw new AppError(409, "Nobody is waiting. Check in patients at reception first.", "CONFLICT");
+    if (!current && !next)
+      throw new AppError(409, "Nobody is waiting. Check in patients at reception first.", "CONFLICT");
   });
   await afterQueueChange(changed, actor, "call_next");
   return getDoctorQueue(doctorId);
@@ -168,13 +207,18 @@ export const callSpecific = async (doctorId: string, appointmentId: string, acto
   await mongoose.connection.transaction(async (session) => {
     changed.length = 0;
     const target = await appointmentService.loadAppointment(appointmentId, session);
-    if (String(target.doctor) !== String(doctor._id) || target.date !== today()) throw new AppError(404, "That patient is not in this doctor's queue today.");
-    if (target.status !== "checked_in") throw new AppError(409, "Only a checked-in (waiting) patient can be called.", "CONFLICT");
+    if (String(target.doctor) !== String(doctor._id) || target.date !== today())
+      throw new AppError(404, "That patient is not in this doctor's queue today.");
+    if (target.status !== "checked_in")
+      throw new AppError(409, "Only a checked-in (waiting) patient can be called.", "CONFLICT");
     const current = await findCurrent(doctor._id, session);
     if (current) {
+      await assertNoOpenVisit(current, session);
       applyTransition(current, "completed", actor);
       await current.save({ session });
-      await mongoose.model("Patient").updateOne({ _id: current.patient }, { $set: { lastVisitDate: current.date } }, { session });
+      await mongoose
+        .model("Patient")
+        .updateOne({ _id: current.patient }, { $set: { lastVisitDate: current.date } }, { session });
       changed.push(current);
     }
     applyTransition(target, "in_consultation", actor, "called out of order");
@@ -188,11 +232,21 @@ export const callSpecific = async (doctorId: string, appointmentId: string, acto
 /** Announce the current serial again on the TV (patient did not hear it) */
 export const recall = async (doctorId: string, actor: Actor) => {
   const doctor = await loadDoctor(doctorId);
-  const current = (await AppointmentModel.findOne({ doctor: doctor._id, date: today(), status: "in_consultation" })) as AppointmentDocument | null;
+  const current = (await AppointmentModel.findOne({
+    doctor: doctor._id,
+    date: today(),
+    status: "in_consultation",
+  })) as AppointmentDocument | null;
   if (!current) throw new AppError(409, "Nobody is with the doctor right now.", "CONFLICT");
   current.calledAt = new Date();
   await current.save();
-  await recordAudit({ req: actor.req, action: "UPDATE", entityType: "Appointment", entityId: current._id, meta: { queueAction: "recall", serialNo: current.serialNo } });
+  await recordAudit({
+    req: actor.req,
+    action: "UPDATE",
+    entityType: "Appointment",
+    entityId: current._id,
+    meta: { queueAction: "recall", serialNo: current.serialNo },
+  });
   notifyRecall({ doctorId: String(doctor._id), serialNo: current.serialNo, roomNo: doctor.roomNo });
   return getDoctorQueue(doctorId);
 };
@@ -202,7 +256,8 @@ export const sendBack = async (appointmentId: string, actor: Actor, scopeDoctorI
   const appt = await appointmentService.loadAppointment(appointmentId);
   const doctorId = String(appt.doctor); // read before populate() replaces the id with the document
   if (scopeDoctorId && doctorId !== scopeDoctorId) throw new AppError(404, "That patient is not in your queue.");
-  if (appt.status !== "in_consultation") throw new AppError(409, "Only the patient currently with the doctor can be sent back.", "CONFLICT");
+  if (appt.status !== "in_consultation")
+    throw new AppError(409, "Only the patient currently with the doctor can be sent back.", "CONFLICT");
   applyTransition(appt, "checked_in", actor, "sent back to waiting");
   await appt.save();
   await afterQueueChange([appt], actor, "send_back");

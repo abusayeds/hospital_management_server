@@ -83,6 +83,22 @@ const envSchema = z.object({
   // Read-only key for the waiting-room TV (/queue-display?key=...). Not a login: it only unlocks masked queue data.
   QUEUE_DISPLAY_KEY: z.string({ required_error: "is required" }).min(16, "must be at least 16 characters"),
 
+  // Printed documents (Phase 4): the QR on a prescription / lab report carries a signed code.
+  // Optional: when empty a key is derived from JWT_SECRET_KEY. Changing it invalidates old QR codes.
+  DOCUMENT_SIGNING_KEY: optionalString,
+  // Public site the QR links to (the verify page). Defaults to the first CLIENT_URL.
+  PUBLIC_APP_URL: optionalString,
+  // Chrome/Chromium used for PDFs. Empty = the browser downloaded by `npm run pdf:setup`.
+  PDF_BROWSER_PATH: optionalString,
+
+  // Clinical AI features (Phase 4). The provider is swappable; only "gemini" is built in.
+  // "none" turns the features off (the screens then say the summary is not configured).
+  AI_PROVIDER: z.enum(["gemini", "none"]).default("gemini"),
+  AI_API_KEY: optionalString, // falls back to GEMINI_API_KEY
+  AI_MODEL: optionalString, // falls back to GEMINI_MODEL; GEMINI_FALLBACK_MODELS are tried next
+  AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(20000),
+  AI_MAX_INPUT_CHARS: z.coerce.number().int().min(1000).max(100000).default(12000),
+
   GEMINI_API_KEY: optionalString,
   GEMINI_MODEL: z.string().default("gemini-flash-latest"),
   GEMINI_FALLBACK_MODELS: z

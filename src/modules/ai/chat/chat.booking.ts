@@ -22,8 +22,17 @@ export const assistantSlots = async (doctorId: string, date: string) => {
     onLeave: day.onLeave,
     leaveReason: day.leaveReason,
     sittings: day.sessions.map((s) => ({ session: s.label, from: s.startTime, to: s.endTime, seatsLeft: s.remaining })),
-    availableTimes: day.slots.filter((s) => s.available).map((s) => s.time).slice(0, 24),
-    message: day.onLeave ? "The doctor is on leave that day." : day.sessions.length === 0 ? "The doctor does not sit that day." : day.availableCount === 0 ? "No free slots that day." : undefined,
+    availableTimes: day.slots
+      .filter((s) => s.available)
+      .map((s) => s.time)
+      .slice(0, 24),
+    message: day.onLeave
+      ? "The doctor is on leave that day."
+      : day.sessions.length === 0
+        ? "The doctor does not sit that day."
+        : day.availableCount === 0
+          ? "No free slots that day."
+          : undefined,
   };
 };
 
@@ -40,7 +49,13 @@ export const assistantBook = async (args: any, chatSessionId: string) => {
   const patient =
     existing ??
     (await createPatient(
-      { name, phone, gender: ["male", "female", "other"].includes(args.gender) ? args.gender : "other", ageYears: Number(args.age) || 0, registrationSource: "chatbot" },
+      {
+        name,
+        phone,
+        gender: ["male", "female", "other"].includes(args.gender) ? args.gender : "other",
+        ageYears: Number(args.age) || 0,
+        registrationSource: "chatbot",
+      },
       { allowDuplicate: true },
     ));
 
@@ -78,7 +93,11 @@ export const assistantFindAppointments = async (rawPhone: string, name: string) 
   const phone = normalizeBdPhone(String(rawPhone ?? ""));
   const matches = await findPossibleDuplicates(phone, String(name ?? ""));
   if (!matches.length) return { appointments: [], message: "No patient with that name on this number." };
-  const appts = await AppointmentModel.find({ patient: { $in: matches.map((m: any) => m._id) }, date: { $gte: todayInDhaka() }, holdsSlot: true })
+  const appts = await AppointmentModel.find({
+    patient: { $in: matches.map((m: any) => m._id) },
+    date: { $gte: todayInDhaka() },
+    holdsSlot: true,
+  })
     .populate("doctor", "title name roomNo")
     .sort({ date: 1, slotTime: 1 })
     .limit(10);

@@ -62,7 +62,10 @@ const createSchema = z.object({ body: doctorBody });
 const updateSchema = z.object({ params: idParams, body: doctorBody.partial() });
 const idSchema = z.object({ params: idParams });
 const slotsSchema = z.object({ params: idParams, query: z.object({ date }) });
-const calendarSchema = z.object({ params: idParams, query: z.object({ days: z.coerce.number().int().min(1).max(60).default(14) }) });
+const calendarSchema = z.object({
+  params: idParams,
+  query: z.object({ days: z.coerce.number().int().min(1).max(60).default(14) }),
+});
 const linkSchema = z.object({ params: idParams, body: z.object({ userId: objectIdSchema.nullable() }) });
 
 // ---------------------------------------------------------------- controller
@@ -74,29 +77,59 @@ const list = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, { statusCode: 200, success: true, message: "Doctors", data: items, pagination });
 });
 const get = catchAsync(async (req: Request, res: Response) => {
-  sendResponse(res, { statusCode: 200, success: true, message: "Doctor", data: await doctorService.getDoctor(req.params.id, { withAccount: isAdmin(req) }) });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Doctor",
+    data: await doctorService.getDoctor(req.params.id, { withAccount: isAdmin(req) }),
+  });
 });
 const slots = catchAsync(async (req: Request, res: Response) => {
-  sendResponse(res, { statusCode: 200, success: true, message: "Slots", data: await getDoctorSlots(req.params.id, String(req.query.date)) });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Slots",
+    data: await getDoctorSlots(req.params.id, String(req.query.date)),
+  });
 });
 const calendar = catchAsync(async (req: Request, res: Response) => {
   const data = await getAvailabilityCalendar(req.params.id, Number(req.query.days));
   sendResponse(res, { statusCode: 200, success: true, message: "Availability", data });
 });
 const create = catchAsync(async (req: Request, res: Response) => {
-  sendResponse(res, { statusCode: 201, success: true, message: "Doctor created", data: await doctorService.createDoctor(req, req.body) });
+  sendResponse(res, {
+    statusCode: 201,
+    success: true,
+    message: "Doctor created",
+    data: await doctorService.createDoctor(req, req.body),
+  });
 });
 const update = catchAsync(async (req: Request, res: Response) => {
-  sendResponse(res, { statusCode: 200, success: true, message: "Doctor updated", data: await doctorService.updateDoctor(req, req.params.id, req.body) });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Doctor updated",
+    data: await doctorService.updateDoctor(req, req.params.id, req.body),
+  });
 });
 const setActive = (active: boolean) =>
   catchAsync(async (req: Request, res: Response) => {
     const data = await doctorService.setDoctorActive(req, req.params.id, active);
-    sendResponse(res, { statusCode: 200, success: true, message: active ? "Doctor activated" : "Doctor deactivated", data });
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: active ? "Doctor activated" : "Doctor deactivated",
+      data,
+    });
   });
 const link = catchAsync(async (req: Request, res: Response) => {
   const data = await doctorService.linkDoctorAccount(req, req.params.id, req.body.userId);
-  sendResponse(res, { statusCode: 200, success: true, message: req.body.userId ? "Account linked" : "Account unlinked", data });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: req.body.userId ? "Account linked" : "Account unlinked",
+    data,
+  });
 });
 
 // ---------------------------------------------------------------- routes

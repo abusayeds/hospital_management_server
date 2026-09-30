@@ -16,7 +16,7 @@ import { DoctorModel } from "./doctor.model";
 // "Sat 09:00-13:00, Sat 17:00-20:00, Mon 09:00-13:00" (week starts on Saturday in Bangladesh)
 export const describeSchedule = (sessions: { dayOfWeek: number; startTime: string; endTime: string }[]): string =>
   [...sessions]
-    .sort((a, b) => (a.dayOfWeek + 1) % 7 - (b.dayOfWeek + 1) % 7 || a.startTime.localeCompare(b.startTime))
+    .sort((a, b) => ((a.dayOfWeek + 1) % 7) - ((b.dayOfWeek + 1) % 7) || a.startTime.localeCompare(b.startTime))
     .map((s) => `${DAY_NAMES_EN[s.dayOfWeek].slice(0, 3)} ${s.startTime}-${s.endTime}`)
     .join(", ");
 
@@ -27,7 +27,13 @@ export const availabilityOn = (doctor: any, date: string) => {
     .filter((s: any) => s.dayOfWeek === weekdayOf(date))
     .sort((a: any, b: any) => a.startTime.localeCompare(b.startTime))
     .map((s: any) => ({ sessionKey: sessionKeyOf(s), startTime: s.startTime, endTime: s.endTime }));
-  return { date, onLeave: Boolean(leave), leaveReason: leave?.reason, sits: !leave && sessions.length > 0, sessions: leave ? [] : sessions };
+  return {
+    date,
+    onLeave: Boolean(leave),
+    leaveReason: leave?.reason,
+    sits: !leave && sessions.length > 0,
+    sessions: leave ? [] : sessions,
+  };
 };
 
 /**
@@ -61,7 +67,9 @@ export const toDoctorSummary = (doctor: any, { withAccount = false } = {}) => ({
   scheduleText: describeSchedule(doctor.sessions ?? []),
   today: availabilityOn(doctor, todayInDhaka()),
   ...(withAccount && {
-    account: doctor.user?._id ? { id: String(doctor.user._id), name: doctor.user.name, email: doctor.user.email } : null,
+    account: doctor.user?._id
+      ? { id: String(doctor.user._id), name: doctor.user.name, email: doctor.user.email }
+      : null,
   }),
 });
 
@@ -71,7 +79,14 @@ const findOrThrow = async (id: string) => {
   return doc;
 };
 
-type ListFilters = { departmentId?: string; search?: string; availableOn?: string; status?: "active" | "inactive"; page: number; limit: number };
+type ListFilters = {
+  departmentId?: string;
+  search?: string;
+  availableOn?: string;
+  status?: "active" | "inactive";
+  page: number;
+  limit: number;
+};
 
 export const listDoctors = async (f: ListFilters, { withAccount = false } = {}) => {
   const filter: Record<string, unknown> = {};
@@ -97,21 +112,32 @@ export const listDoctors = async (f: ListFilters, { withAccount = false } = {}) 
       .limit(f.limit),
     DoctorModel.countDocuments(filter),
   ]);
-  return { items: items.map((d: any) => toDoctorSummary(d, { withAccount })), pagination: buildPagination(f.page, f.limit, total) };
+  return {
+    items: items.map((d: any) => toDoctorSummary(d, { withAccount })),
+    pagination: buildPagination(f.page, f.limit, total),
+  };
 };
 
-export const getDoctor = async (id: string, { withAccount = false } = {}) => toDoctorSummary(await findOrThrow(id), { withAccount });
+export const getDoctor = async (id: string, { withAccount = false } = {}) =>
+  toDoctorSummary(await findOrThrow(id), { withAccount });
 
 type DoctorInput = Partial<Record<string, any>> & { department?: string; sessions?: any[]; leaves?: any[] };
 
 const assertValidInput = async (input: DoctorInput) => {
   if (input.department && !(await DepartmentModel.exists({ _id: input.department, isActive: true }))) {
-    throw new AppError(400, "Choose an active department.", "VALIDATION_ERROR", [{ path: "body.department", message: "not found or inactive" }]);
+    throw new AppError(400, "Choose an active department.", "VALIDATION_ERROR", [
+      { path: "body.department", message: "not found or inactive" },
+    ]);
   }
   if (input.sessions) {
     const problems = validateSessions(input.sessions);
     if (problems.length) {
-      throw new AppError(400, problems[0], "VALIDATION_ERROR", problems.map((message) => ({ path: "body.sessions", message })));
+      throw new AppError(
+        400,
+        problems[0],
+        "VALIDATION_ERROR",
+        problems.map((message) => ({ path: "body.sessions", message })),
+      );
     }
   }
 };
@@ -163,7 +189,8 @@ export const linkDoctorAccount = async (req: Request, doctorId: string, userId: 
   if (userId) {
     const user = await UserModel.findById(userId);
     if (!user) throw new AppError(404, "User not found.");
-    if (user.role !== "doctor") throw new AppError(400, "Only an account with the Doctor role can be linked.", "VALIDATION_ERROR");
+    if (user.role !== "doctor")
+      throw new AppError(400, "Only an account with the Doctor role can be linked.", "VALIDATION_ERROR");
     const other = await DoctorModel.findOne({ user: user._id, _id: { $ne: doctor._id } });
     if (other) throw new AppError(409, `This account is already linked to ${other.title} ${other.name}.`, "CONFLICT");
   }

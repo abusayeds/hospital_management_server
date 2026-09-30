@@ -61,7 +61,8 @@ export const toolDeclarations: FunctionDeclaration[] = [
   },
   {
     name: "find_my_appointments",
-    description: "Find the upcoming appointments of the patient in this chat. Needs BOTH their mobile number and their name (for privacy).",
+    description:
+      "Find the upcoming appointments of the patient in this chat. Needs BOTH their mobile number and their name (for privacy).",
     parametersJsonSchema: {
       type: "object",
       properties: { phone: { type: "string" }, patient_name: { type: "string" } },
@@ -93,7 +94,10 @@ export type TToolContext = {
 export const executeTool = async (name: string, args: any, ctx: TToolContext): Promise<unknown> => {
   switch (name) {
     case "list_departments":
-      return (await DepartmentModel.find({ isActive: true }).sort({ displayOrder: 1, name: 1 })).map((d: any) => ({ name: d.name, nameBn: d.nameBn }));
+      return (await DepartmentModel.find({ isActive: true }).sort({ displayOrder: 1, name: 1 })).map((d: any) => ({
+        name: d.name,
+        nameBn: d.nameBn,
+      }));
 
     case "search_doctors":
       return searchDoctorsByText({ department: args?.department, name: args?.name });

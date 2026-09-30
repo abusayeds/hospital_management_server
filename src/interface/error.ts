@@ -18,7 +18,16 @@ export type TErrorCode =
   | "PASSWORD_CHANGE_REQUIRED"
   | "SESSION_EXPIRED"
   | "SESSION_REVOKED"
-  | "CSRF_REJECTED";
+  | "CSRF_REJECTED"
+  // clinical (Phase 4)
+  | "VISIT_OPEN"
+  | "VISIT_CLOSED"
+  | "ALLERGY_CONFLICT"
+  | "FOUR_EYES_REQUIRED"
+  // AI layer (Phase 4)
+  | "AI_NOT_CONFIGURED"
+  | "AI_UNAVAILABLE"
+  | "AI_INVALID_OUTPUT";
 
 // One field-level problem, e.g. { path: "body.phone", message: "Required" }
 export type TFieldError = { path: string; message: string };

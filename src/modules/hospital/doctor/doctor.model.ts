@@ -80,4 +80,5 @@ DoctorSchema.index({ name: 1 });
 DoctorSchema.plugin(basePlugin);
 
 export const DoctorModel =
-  mongoose.models.Doctor || mongoose.model<IDoctor, mongoose.Model<IDoctor, object, IBaseMethods>>("Doctor", DoctorSchema);
+  mongoose.models.Doctor ||
+  mongoose.model<IDoctor, mongoose.Model<IDoctor, object, IBaseMethods>>("Doctor", DoctorSchema);

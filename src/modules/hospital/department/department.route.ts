@@ -12,7 +12,11 @@ const body = z.object({
   name: z.string().trim().min(2).max(80),
   nameBn: z.string().trim().min(2).max(80),
   description: z.string().trim().max(300).optional(),
-  icon: z.string().trim().regex(/^[a-z0-9-]{2,40}$/, "use a lucide icon key such as heart-pulse").optional(),
+  icon: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9-]{2,40}$/, "use a lucide icon key such as heart-pulse")
+    .optional(),
   displayOrder: z.number().int().min(0).max(1000).optional(),
 });
 const idParams = z.object({ id: objectIdSchema });
@@ -27,15 +31,30 @@ const list = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, { statusCode: 200, success: true, message: "Departments", data });
 });
 const create = catchAsync(async (req: Request, res: Response) => {
-  sendResponse(res, { statusCode: 201, success: true, message: "Department created", data: await departmentService.createDepartment(req, req.body) });
+  sendResponse(res, {
+    statusCode: 201,
+    success: true,
+    message: "Department created",
+    data: await departmentService.createDepartment(req, req.body),
+  });
 });
 const update = catchAsync(async (req: Request, res: Response) => {
-  sendResponse(res, { statusCode: 200, success: true, message: "Department updated", data: await departmentService.updateDepartment(req, req.params.id, req.body) });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Department updated",
+    data: await departmentService.updateDepartment(req, req.params.id, req.body),
+  });
 });
 const setActive = (active: boolean) =>
   catchAsync(async (req: Request, res: Response) => {
     const data = await departmentService.setDepartmentActive(req, req.params.id, active);
-    sendResponse(res, { statusCode: 200, success: true, message: active ? "Department activated" : "Department deactivated", data });
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: active ? "Department activated" : "Department deactivated",
+      data,
+    });
   });
 
 // ---- routes

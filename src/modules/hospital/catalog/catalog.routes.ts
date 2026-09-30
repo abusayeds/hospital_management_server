@@ -47,11 +47,18 @@ export const labTestCatalog = makeCatalog({
     sampleType: z.string().trim().min(2).max(60),
     preparationNote: z.string().trim().max(300).optional(),
     preparationNoteBn: z.string().trim().max(300).optional(),
-    turnaroundHours: z.number().int().min(0).max(24 * 30),
+    turnaroundHours: z
+      .number()
+      .int()
+      .min(0)
+      .max(24 * 30),
     parameters: z
       .array(labParameter)
       .max(60)
-      .refine((ps) => ps.every((p) => p.normalMin == null || p.normalMax == null || p.normalMin <= p.normalMax), "normalMin must not exceed normalMax")
+      .refine(
+        (ps) => ps.every((p) => p.normalMin == null || p.normalMax == null || p.normalMin <= p.normalMax),
+        "normalMin must not exceed normalMax",
+      )
       .default([]),
     isActive: z.boolean().optional(),
   }),

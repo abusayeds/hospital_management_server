@@ -8,7 +8,15 @@ import { addDays, todayInDhaka } from "../src/utils/date";
 export const TOMORROW = () => addDays(todayInDhaka(), 1);
 
 /** A department and a doctor who sits every day 09:00–12:00 (10-minute slots) */
-export const createClinic = async (overrides: { maxPatients?: number; followUpValidDays?: number; userId?: unknown; departmentName?: string; doctorName?: string } = {}) => {
+export const createClinic = async (
+  overrides: {
+    maxPatients?: number;
+    followUpValidDays?: number;
+    userId?: unknown;
+    departmentName?: string;
+    doctorName?: string;
+  } = {},
+) => {
   clearSettingsCache();
   // The unique indexes must exist before parallel inserts, or the race is not protected
   await Promise.all([AppointmentModel.init(), DoctorModel.init(), PatientModel.init()]);
@@ -22,7 +30,13 @@ export const createClinic = async (overrides: { maxPatients?: number; followUpVa
     averageMinutesPerPatient: 10,
     roomNo: "101",
     user: overrides.userId ?? null,
-    sessions: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({ dayOfWeek, startTime: "09:00", endTime: "12:00", slotMinutes: 10, maxPatients: overrides.maxPatients ?? 18 })),
+    sessions: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+      dayOfWeek,
+      startTime: "09:00",
+      endTime: "12:00",
+      slotMinutes: 10,
+      maxPatients: overrides.maxPatients ?? 18,
+    })),
   });
   return { department, doctor };
 };
@@ -42,3 +56,27 @@ export const createPatients = async (count: number) =>
       });
     }),
   );
+
+/** Insert an appointment directly (bypasses booking rules — for clinical tests) */
+export const createAppointment = async (a: {
+  patient: { _id: unknown };
+  doctor: { _id: unknown; department: unknown };
+  status?: string;
+  date?: string;
+  slotTime?: string;
+  serialNo?: number;
+}) =>
+  AppointmentModel.create({
+    patient: a.patient._id,
+    doctor: a.doctor._id,
+    department: a.doctor.department,
+    date: a.date ?? todayInDhaka(),
+    slotTime: a.slotTime ?? "09:00",
+    sessionKey: "09:00-12:00",
+    serialNo: a.serialNo ?? 1,
+    feeSnapshot: 70000,
+    status: a.status ?? "checked_in",
+    holdsSlot: ["booked", "checked_in", "in_consultation"].includes(a.status ?? "checked_in"),
+    checkedInAt: new Date(),
+    statusHistory: [{ status: a.status ?? "checked_in", at: new Date() }],
+  });

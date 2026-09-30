@@ -49,7 +49,11 @@ export const makeCatalog = (opts: CatalogOptions) => {
       filter.$or = opts.searchFields.map((f) => ({ [f]: rx }));
     }
     const [items, total] = await Promise.all([
-      opts.model.find(filter).sort(opts.sort).skip((page - 1) * limit).limit(limit),
+      opts.model
+        .find(filter)
+        .sort(opts.sort)
+        .skip((page - 1) * limit)
+        .limit(limit),
       opts.model.countDocuments(filter),
     ]);
     return { items: items.map(serialize), pagination: buildPagination(page, limit, total) };
@@ -66,7 +70,14 @@ export const makeCatalog = (opts: CatalogOptions) => {
     const before = serialize(doc);
     doc.set({ ...input, updatedBy: req.user!.id });
     await doc.save();
-    await recordAudit({ req, action: "UPDATE", entityType: opts.entityType, entityId: doc._id, before, after: serialize(doc) });
+    await recordAudit({
+      req,
+      action: "UPDATE",
+      entityType: opts.entityType,
+      entityId: doc._id,
+      before,
+      after: serialize(doc),
+    });
     return serialize(doc);
   };
 
@@ -113,7 +124,13 @@ export const makeCatalog = (opts: CatalogOptions) => {
     validateRequest(listSchema),
     catchAsync(async (req: Request, res: Response) => {
       const { items, pagination } = await list(req.query);
-      sendResponse(res, { statusCode: 200, success: true, message: `${opts.entityType} list`, data: items, pagination });
+      sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: `${opts.entityType} list`,
+        data: items,
+        pagination,
+      });
     }),
   );
   router.get(
@@ -121,7 +138,12 @@ export const makeCatalog = (opts: CatalogOptions) => {
     canRead,
     validateRequest(idParams),
     catchAsync(async (req: Request, res: Response) => {
-      sendResponse(res, { statusCode: 200, success: true, message: opts.entityType, data: serialize(await findOrThrow(req.params.id)) });
+      sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: opts.entityType,
+        data: serialize(await findOrThrow(req.params.id)),
+      });
     }),
   );
   router.post(
@@ -129,7 +151,12 @@ export const makeCatalog = (opts: CatalogOptions) => {
     canManage,
     validateRequest(createSchema),
     catchAsync(async (req: Request, res: Response) => {
-      sendResponse(res, { statusCode: 201, success: true, message: `${opts.entityType} created`, data: await create(req, req.body) });
+      sendResponse(res, {
+        statusCode: 201,
+        success: true,
+        message: `${opts.entityType} created`,
+        data: await create(req, req.body),
+      });
     }),
   );
   router.patch(
@@ -137,16 +164,29 @@ export const makeCatalog = (opts: CatalogOptions) => {
     canManage,
     validateRequest(updateSchema),
     catchAsync(async (req: Request, res: Response) => {
-      sendResponse(res, { statusCode: 200, success: true, message: `${opts.entityType} updated`, data: await update(req, req.params.id, req.body) });
+      sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: `${opts.entityType} updated`,
+        data: await update(req, req.params.id, req.body),
+      });
     }),
   );
-  for (const [path, active] of [["activate", true], ["deactivate", false]] as const) {
+  for (const [path, active] of [
+    ["activate", true],
+    ["deactivate", false],
+  ] as const) {
     router.patch(
       `/:id/${path}`,
       canManage,
       validateRequest(idParams),
       catchAsync(async (req: Request, res: Response) => {
-        sendResponse(res, { statusCode: 200, success: true, message: `${opts.entityType} ${path}d`, data: await setActive(req, req.params.id, active) });
+        sendResponse(res, {
+          statusCode: 200,
+          success: true,
+          message: `${opts.entityType} ${path}d`,
+          data: await setActive(req, req.params.id, active),
+        });
       }),
     );
   }

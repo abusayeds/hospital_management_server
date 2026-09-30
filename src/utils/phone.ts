@@ -9,7 +9,9 @@ const BD_MOBILE = /^01[3-9]\d{8}$/;
 
 /** Any accepted spelling → "+8801XXXXXXXXX", or null if it is not a valid BD mobile */
 export const toE164Bd = (input: string): string | null => {
-  const digits = String(input).replace(/\D/g, "").replace(/^0*88(?=01)/, "");
+  const digits = String(input)
+    .replace(/\D/g, "")
+    .replace(/^0*88(?=01)/, "");
   return BD_MOBILE.test(digits) ? `+88${digits}` : null;
 };
 

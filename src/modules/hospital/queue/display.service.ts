@@ -33,10 +33,10 @@ export const getDisplayBoard = async () => {
   const [settings, doctors, appts] = await Promise.all([
     getSettings(),
     DoctorModel.find({ isActive: true }).populate("department", "name nameBn").sort({ roomNo: 1 }),
-    AppointmentModel.find({ date, status: { $in: ["checked_in", "in_consultation"] } }, { doctor: 1, status: 1, priority: 1, serialNo: 1, patient: 1 }).populate(
-      "patient",
-      "name",
-    ),
+    AppointmentModel.find(
+      { date, status: { $in: ["checked_in", "in_consultation"] } },
+      { doctor: 1, status: 1, priority: 1, serialNo: 1, patient: 1 },
+    ).populate("patient", "name"),
   ]);
 
   const byDoctor = new Map<string, any[]>();
@@ -51,7 +51,12 @@ export const getDisplayBoard = async () => {
       const leave = findLeave(d.leaves ?? [], date);
       const session = leave
         ? undefined
-        : (d.sessions ?? []).find((s: any) => s.dayOfWeek === weekdayOf(date) && toMinutes(s.startTime) - SHOW_BEFORE <= now && now < toMinutes(s.endTime) + SHOW_AFTER);
+        : (d.sessions ?? []).find(
+            (s: any) =>
+              s.dayOfWeek === weekdayOf(date) &&
+              toMinutes(s.startTime) - SHOW_BEFORE <= now &&
+              now < toMinutes(s.endTime) + SHOW_AFTER,
+          );
       if (!session && line.length === 0) return null; // not in session → not on the TV
       const current = line.find((a) => a.status === "in_consultation");
       return {
@@ -61,12 +66,18 @@ export const getDisplayBoard = async () => {
         department: d.department?.name ?? "",
         departmentBn: d.department?.nameBn ?? "",
         roomNo: d.roomNo ?? "",
-        session: session ? { ...sessionLabel(session.startTime), startTime: session.startTime, endTime: session.endTime } : null,
+        session: session
+          ? { ...sessionLabel(session.startTime), startTime: session.startTime, endTime: session.endTime }
+          : null,
         nowServing: current ? { serialNo: current.serialNo, maskedName: maskName(current.patient?.name ?? "") } : null,
         next: line
           .filter((a) => a.status === "checked_in")
           .slice(0, 3)
-          .map((a) => ({ serialNo: a.serialNo, maskedName: maskName(a.patient?.name ?? ""), priority: a.priority === "normal" ? undefined : a.priority })),
+          .map((a) => ({
+            serialNo: a.serialNo,
+            maskedName: maskName(a.patient?.name ?? ""),
+            priority: a.priority === "normal" ? undefined : a.priority,
+          })),
         waitingCount: line.filter((a) => a.status === "checked_in").length,
       };
     })

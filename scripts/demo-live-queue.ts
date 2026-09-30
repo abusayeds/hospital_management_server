@@ -28,15 +28,32 @@ const run = async () => {
   ]);
   const demoDoctor = await DoctorModel.findOne({ user: { $ne: null } }, { _id: 1 });
   const ids = busiest.map((b) => String(b._id));
-  const chosen = [...new Set([...(demoDoctor && ids.includes(String(demoDoctor._id)) ? [String(demoDoctor._id)] : []), ...ids])].slice(0, DOCTORS);
+  const chosen = [
+    ...new Set([...(demoDoctor && ids.includes(String(demoDoctor._id)) ? [String(demoDoctor._id)] : []), ...ids]),
+  ].slice(0, DOCTORS);
   if (!chosen.length) {
     logger.warn("No appointments today — run `npm run seed:reset` first (on a day the doctors sit).");
     return;
   }
 
   for (const doctorId of chosen) {
-    const rows = await AppointmentModel.find({ doctor: doctorId, date, status: { $in: ["completed", "no_show", "checked_in", "in_consultation", "booked"] } }).sort({ slotTime: -1 }).limit(8);
-    const plan = ["booked", "booked", "booked", "checked_in", "checked_in", "checked_in", "checked_in", "in_consultation"] as const;
+    const rows = await AppointmentModel.find({
+      doctor: doctorId,
+      date,
+      status: { $in: ["completed", "no_show", "checked_in", "in_consultation", "booked"] },
+    })
+      .sort({ slotTime: -1 })
+      .limit(8);
+    const plan = [
+      "booked",
+      "booked",
+      "booked",
+      "checked_in",
+      "checked_in",
+      "checked_in",
+      "checked_in",
+      "in_consultation",
+    ] as const;
     for (const [i, appt] of rows.entries()) {
       const status = plan[i];
       const minutesAgo = (plan.length - i) * 6;
@@ -47,7 +64,14 @@ const run = async () => {
         consultationStartedAt: status === "in_consultation" ? new Date(now - 4 * 60000) : null,
         calledAt: status === "in_consultation" ? new Date(now - 4 * 60000) : null,
         checkedInAt: status === "booked" ? null : new Date(now - minutesAgo * 60000),
-        priority: i === 4 ? "elderly" : i === 5 && appt.priority === "emergency" ? "emergency" : appt.priority === "emergency" ? "normal" : appt.priority,
+        priority:
+          i === 4
+            ? "elderly"
+            : i === 5 && appt.priority === "emergency"
+              ? "emergency"
+              : appt.priority === "emergency"
+                ? "normal"
+                : appt.priority,
         statusHistory: [
           { status: "booked", at: new Date(now - 86_400_000) },
           ...(status === "booked" ? [] : [{ status: "checked_in", at: new Date(now - minutesAgo * 60000) }]),

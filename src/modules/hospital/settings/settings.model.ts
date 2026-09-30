@@ -18,6 +18,8 @@ export interface IHospitalSettings extends IBaseFields {
   cancellationCutoffMinutes: number; // no cancelling this close to the appointment
   defaultSlotMinutes: number; // pre-filled in the schedule editor
   displayNotice?: string; // scrolling line at the bottom of the waiting-room TV
+  // Four-eyes rule: lab results must be verified by a different person than the one who entered them
+  labFourEyes: boolean;
 }
 
 const HospitalSettingsSchema = new Schema<IHospitalSettings>({
@@ -36,6 +38,7 @@ const HospitalSettingsSchema = new Schema<IHospitalSettings>({
   cancellationCutoffMinutes: { type: Number, default: 60, min: 0, max: 24 * 60 },
   defaultSlotMinutes: { type: Number, default: 10, min: 5, max: 120 },
   displayNotice: { type: String, trim: true, maxlength: 300 },
+  labFourEyes: { type: Boolean, default: true },
 });
 HospitalSettingsSchema.plugin(basePlugin);
 

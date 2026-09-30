@@ -10,7 +10,7 @@ import type { Role } from "../../config/permissions";
  *  - tl_refresh : random opaque token, 7 days, sent ONLY to /api/v1/auth
  *  - tl_session : "1", no secret — lets the Next.js route guard know someone
  *                 is signed in so it can redirect to /login without a round trip
- * sameSite=lax + secure in production. See docs/PROJECT_CONTEXT.md (Auth design).
+ * sameSite=lax + secure in production. See backend/README.md §6 (Authentication).
  */
 export const ACCESS_COOKIE = "tl_access";
 export const REFRESH_COOKIE = "tl_refresh";

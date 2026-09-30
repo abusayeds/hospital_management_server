@@ -11,6 +11,8 @@ export const DEMO_USERS: { role: Role; email: string; name: string; phone: strin
   { role: "doctor", email: "doctor@testolife.test", name: "Dr. Farhana Rahman", phone: "01700000204" },
   { role: "nurse", email: "nurse@testolife.test", name: "Shirin Sultana", phone: "01700000205" },
   { role: "lab_technician", email: "lab@testolife.test", name: "Rafiqul Islam", phone: "01700000206" },
+  // Second lab account: lab reports need a different person to verify them (four-eyes)
+  { role: "lab_technician", email: "lab2@testolife.test", name: "Mitu Rani Das", phone: "01700000210" },
   { role: "pharmacist", email: "pharmacy@testolife.test", name: "Mahmudul Karim", phone: "01700000207" },
   { role: "accounts", email: "accounts@testolife.test", name: "Sharmin Jahan", phone: "01700000208" },
   { role: "patient", email: "patient@testolife.test", name: "Abdur Rahim", phone: "01700000209" },
