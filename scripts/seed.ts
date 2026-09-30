@@ -1,0 +1,20 @@
+// Usage: npm run seed
+// Creates demo departments/doctors and one demo account per role (password =
+// DEMO_PASSWORD from .env). Idempotent — running it twice does not duplicate data.
+// Also removes user records left over from the old pre-Phase-2 user module.
+import { connectDatabase, disconnectDatabase } from "../src/config/database";
+import seedDatabase from "../src/DB";
+import { logger } from "../src/utils/logger";
+
+const run = async () => {
+  await connectDatabase();
+  await seedDatabase();
+  logger.info("Seeding finished");
+};
+
+run()
+  .catch((err) => {
+    logger.error({ err }, "Seeding failed");
+    process.exitCode = 1;
+  })
+  .finally(() => disconnectDatabase());

@@ -1,0 +1,21 @@
+{
+  // Build config: compiles src/ to dist/. Source uses ES module syntax
+  // (import/export); output is CommonJS for maximum library compatibility.
+  // scripts/ and tests/ run directly through tsx and are type-checked by `npm run typecheck`.
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"],
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "CommonJS",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "paths": { "@google/genai": ["./node_modules/@google/genai/dist/node/node.d.ts"] },
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "sourceMap": true
+  }
+}

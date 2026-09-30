@@ -1,0 +1,6 @@
+{
+  // Type-check everything (src + scripts + tests) without emitting files
+  "extends": "./tsconfig.json",
+  "include": ["src", "scripts", "tests"],
+  "compilerOptions": { "noEmit": true, "rootDir": "." }
+}
