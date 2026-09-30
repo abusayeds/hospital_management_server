@@ -31,6 +31,9 @@ const updateSettingsSchema = z.object({
       defaultSlotMinutes: z.number().int().min(5).max(120),
       displayNotice: z.string().trim().max(300),
       labFourEyes: z.boolean(),
+      assistantDailyAiBudget: z.number().int().min(0).max(1_000_000),
+      assistantEmergencyKeywords: z.array(z.string().trim().min(2).max(60)).max(100),
+      assistantTakeoverReminderMinutes: z.number().int().min(1).max(120),
     })
     .partial(),
 });

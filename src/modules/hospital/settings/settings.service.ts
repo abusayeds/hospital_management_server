@@ -25,6 +25,9 @@ const defaults = (): HospitalSettings => ({
   displayNotice:
     "অনুগ্রহ করে আপনার সিরিয়াল নম্বরের জন্য অপেক্ষা করুন · Please wait for your serial number to be called",
   labFourEyes: true,
+  assistantDailyAiBudget: 3000,
+  assistantEmergencyKeywords: [],
+  assistantTakeoverReminderMinutes: 5,
 });
 
 // Settings are read on every booking; cache them in memory and drop the cache on update.

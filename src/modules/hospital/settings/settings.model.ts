@@ -20,6 +20,10 @@ export interface IHospitalSettings extends IBaseFields {
   displayNotice?: string; // scrolling line at the bottom of the waiting-room TV
   // Four-eyes rule: lab results must be verified by a different person than the one who entered them
   labFourEyes: boolean;
+  // Patient assistant (Phase 5)
+  assistantDailyAiBudget: number; // max AI calls per day for the assistant (cost guard)
+  assistantEmergencyKeywords: string[]; // extra emergency words/phrases, added to the built-in list
+  assistantTakeoverReminderMinutes: number; // remind staff when a taken-over chat waits this long
 }
 
 const HospitalSettingsSchema = new Schema<IHospitalSettings>({
@@ -39,6 +43,9 @@ const HospitalSettingsSchema = new Schema<IHospitalSettings>({
   defaultSlotMinutes: { type: Number, default: 10, min: 5, max: 120 },
   displayNotice: { type: String, trim: true, maxlength: 300 },
   labFourEyes: { type: Boolean, default: true },
+  assistantDailyAiBudget: { type: Number, default: 3000, min: 0, max: 1_000_000 },
+  assistantEmergencyKeywords: { type: [String], default: [] },
+  assistantTakeoverReminderMinutes: { type: Number, default: 5, min: 1, max: 120 },
 });
 HospitalSettingsSchema.plugin(basePlugin);
 

@@ -174,7 +174,7 @@ const runAssistant = async (conv: ConversationDocument, userText: string, inboun
     );
     model = res.model;
     if (!res.toolCalls.length) {
-      const guarded = guardOutput(res.text, conv);
+      const guarded = await guardOutput(res.text, conv);
       const text: OutboundMessage[] = guarded.text ? [{ type: "text", text: guarded.text }] : [];
       return { messages: [...text, ...dedupeUi(ctx.ui)], toolLogs, model, flags: guarded.flags };
     }
@@ -275,8 +275,11 @@ export const handleInbound = async (inbound: InboundMessage): Promise<EngineResu
   void publish("chat.message_received", { conversationId: String(conv._id), channel });
   notifyInbox(conv);
 
-  // A staff member is handling it: the assistant stays quiet
-  if (conv.status === "human_active") return { conversation: conv, messages: [], stored: [] };
+  // A staff member is handling it: the assistant stays quiet — except for emergency instructions
+  if (conv.status === "human_active") {
+    const pre = text ? await preChecks(conv, text) : null;
+    if (pre?.flag !== "emergency") return { conversation: conv, messages: [], stored: [] };
+  }
 
   const started = Date.now();
   let outcome: AiOutcome;
@@ -297,7 +300,7 @@ export const handleInbound = async (inbound: InboundMessage): Promise<EngineResu
   } else {
     const pre = await preChecks(conv, text);
     const tapped = pre ? null : await handleInteraction(conv, inbound.replyId, text);
-    if (pre) outcome = { messages: pre.messages, toolLogs: [], flags: ["pre_check"] };
+    if (pre) outcome = { messages: pre.messages, toolLogs: [], flags: [pre.flag] };
     else if (tapped) outcome = { messages: tapped.messages, toolLogs: [], flags: [] };
     else if (inbound.replyId === "menu|human") {
       await requestHandover(conv, "Patient asked for a person");
@@ -321,7 +324,8 @@ export const handleInbound = async (inbound: InboundMessage): Promise<EngineResu
       if (!outcome.messages.length) outcome.messages = await fallbackMessages();
     }
   }
-  if (isFirst && !outcome.messages.some((m) => m.type === "quick_replies" || m.type === "list"))
+  const isEmergency = outcome.flags.includes("emergency");
+  if (isFirst && !isEmergency && !outcome.messages.some((m) => m.type === "quick_replies" || m.type === "list"))
     outcome.messages.push({
       type: "quick_replies",
       text: "আর কীভাবে সাহায্য করতে পারি? · How else can I help?",
