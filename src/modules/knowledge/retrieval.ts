@@ -103,8 +103,34 @@ const vectorSearch = async (query: string, limit: number): Promise<Passage[] | n
   }
 };
 
+/**
+ * Words too common to decide relevance. The text index uses language "none" (so Bangla is not
+ * mangled by English stemming), which also means MongoDB removes NO stop-words — we do it here,
+ * otherwise "can" and "with" outrank "bKash".
+ */
+const STOP_WORDS = new Set(
+  (
+    "a an the i me my you your we our is are was be can could do does did have has how what when where which who why " +
+    "to of in on at for from with and or not no yes it this that there please tell about any some hospital patient patients " +
+    "কি কী কে কবে কোথায় কোন কেন আছে আছেন হবে হয় আমার আমি আপনার আপনি করে করতে এর এই সেই জন্য না হ্যাঁ দিয়ে থেকে " +
+    "ki ke kobe kothay kon keno ache hobe amar ami apnar apni kore korte er jonno na"
+  ).split(" "),
+);
+
+/** The meaningful words of a question (lower-case, stop-words removed) */
+export const searchTerms = (query: string) =>
+  query
+    .toLowerCase()
+    .split(/[\s,.?!।:;()"'/]+/)
+    .filter((w) => w.length >= 2 && !STOP_WORDS.has(w));
+
 const textSearch = async (query: string, limit: number): Promise<Passage[]> => {
-  const rows = await KnowledgeChunkModel.find({ $text: { $search: query } }, { score: { $meta: "textScore" } })
+  const terms = searchTerms(query);
+  if (!terms.length) return [];
+  const rows = await KnowledgeChunkModel.find(
+    { $text: { $search: terms.join(" ") } },
+    { score: { $meta: "textScore" } },
+  )
     .sort({ score: { $meta: "textScore" } })
     .limit(limit)
     .lean<any[]>()
@@ -117,11 +143,8 @@ const textSearch = async (query: string, limit: number): Promise<Passage[]> => {
       score: Math.round(r.score * 100) / 100,
       method: "text" as const,
     }));
-  // Last resort: any meaningful word of the question appears in the chunk
-  const words = query
-    .split(/[\s,.?!।]+/)
-    .filter((w) => w.length >= 3)
-    .slice(0, 6);
+  // Last resort: a meaningful word of the question appears inside the chunk (e.g. Bangla word forms)
+  const words = terms.filter((w) => w.length >= 3).slice(0, 6);
   if (!words.length) return [];
   const regex = words.map((w) => ({ text: new RegExp(escapeRegex(w), "i") }));
   const hits = await KnowledgeChunkModel.find({ $or: regex }).limit(limit).lean<any[]>();

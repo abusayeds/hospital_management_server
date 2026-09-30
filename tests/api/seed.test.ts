@@ -2,6 +2,8 @@ import { seedDemoUsers } from "../../src/DB/demoUsers";
 import { linkDemoDoctor, seedHospitalData } from "../../src/DB/hospitalSeed";
 import { seedClinicalHistory } from "../../src/DB/seed-data/clinicalHistory";
 import { seedDemoActivity } from "../../src/DB/seed-data/demoActivity";
+import { seedAssistantDemo } from "../../src/DB/seed-data/assistantDemo";
+import { ConversationModel } from "../../src/modules/assistant/conversation.model";
 import { LabOrderModel } from "../../src/modules/clinical/lab/labOrder.model";
 import { PrescriptionTemplateModel, VisitModel } from "../../src/modules/clinical/visits/visit.model";
 import { useTestDatabase } from "../helpers";
@@ -26,5 +28,11 @@ describe("Demo seed", () => {
 
     await seedClinicalHistory();
     expect(await VisitModel.countDocuments()).toBe(visits);
+
+    await seedAssistantDemo();
+    expect(await ConversationModel.countDocuments({ emergency: true })).toBe(1);
+    expect(await ConversationModel.countDocuments({ status: "needs_human" })).toBe(2);
+    await seedAssistantDemo();
+    expect(await ConversationModel.countDocuments()).toBe(4);
   }, 120_000);
 });

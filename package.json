@@ -23,7 +23,8 @@
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "permissions:export": "npm run shared:export",
     "shared:export": "tsx scripts/export-permissions.ts",
-    "pdf:setup": "puppeteer browsers install chrome-headless-shell"
+    "pdf:setup": "puppeteer browsers install chrome-headless-shell",
+    "eval:chatbot": "tsx scripts/eval-chatbot.ts"
   },
   "keywords": [],
   "author": "",
