@@ -104,7 +104,13 @@ const memoryTurns = async (conv: ConversationDocument, excludeId: unknown): Prom
   const turns: AiTurn[] = [];
   for (const m of recent.reverse()) {
     const role = m.sender === "patient" ? "user" : "model";
-    const text = m.sender === "staff" ? `[Hospital staff replied]: ${m.text}` : m.text;
+    // A tapped button is remembered by its meaning (ids, times), not only by its label
+    const text =
+      m.sender === "staff"
+        ? `[Hospital staff replied]: ${m.text}`
+        : m.sender === "patient" && m.replyId
+          ? describeReply(m.replyId, m.text)
+          : m.text;
     if (!text) continue;
     const last = turns[turns.length - 1];
     if (last && last.role === role && "text" in last) last.text = `${last.text}\n${text}`;
@@ -241,6 +247,7 @@ export const handleInbound = async (inbound: InboundMessage): Promise<EngineResu
   const conv = await loadConversation(inbound);
   const text = (inbound.text ?? "").trim().slice(0, 2000);
   const shown = text || (inbound.replyId ? describeReply(inbound.replyId) : "");
+  const forModel = inbound.replyId ? describeReply(inbound.replyId, text) : text;
 
   let inboundDoc: ChatMessageDocument;
   try {
@@ -306,7 +313,7 @@ export const handleInbound = async (inbound: InboundMessage): Promise<EngineResu
       };
     } else {
       try {
-        outcome = await runAssistant(conv, shown, inboundDoc._id);
+        outcome = await runAssistant(conv, forModel, inboundDoc._id);
       } catch (err) {
         logger.warn({ err: (err as Error).message, conversationId: String(conv._id) }, "Assistant fallback used");
         outcome = { messages: await fallbackMessages(), toolLogs: [], flags: ["ai_failure"] };

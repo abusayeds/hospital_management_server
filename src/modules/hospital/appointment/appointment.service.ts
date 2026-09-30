@@ -180,6 +180,12 @@ const detectVisitType = async (patientId: Types.ObjectId, doctor: any, date: str
   return recent ? ("follow_up" as const) : ("new" as const);
 };
 
+/** The fee this patient would pay (new or follow-up) — shown on confirmation summaries before booking */
+export const estimateFee = async (patientId: string, doctor: any, date: string) => {
+  const type = await detectVisitType(new Types.ObjectId(patientId), doctor, date, null as unknown as ClientSession);
+  return { type, fee: type === "follow_up" ? (doctor.followUpFee as number) : (doctor.consultationFee as number) };
+};
+
 /** Book inside an existing transaction (used by bookAppointment and rescheduleAppointment) */
 const bookWithinSession = async (
   input: BookInput,

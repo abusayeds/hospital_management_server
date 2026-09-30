@@ -59,7 +59,9 @@ export const describeReply = (replyId: string, label?: string): string => {
     case "slot":
       return `Book doctorId ${rest[0]} on ${rest[1]} at ${rest[2]}.`;
     case "patient":
-      return `The appointment is for ${rest[0]}.`;
+      return rest[0] === "new"
+        ? "It is for someone else who is not registered yet. Ask me their name, age and gender."
+        : `The appointment is for ${rest[0]}.`;
     case "appt":
       return `About appointment ${rest[0]}.`;
     default:

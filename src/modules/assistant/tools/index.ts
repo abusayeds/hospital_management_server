@@ -2,12 +2,39 @@ import AppError from "../../../errors/AppError";
 import { logger } from "../../../utils/logger";
 import type { AiToolCall, AiToolDef } from "../../../ai/provider";
 import type { ToolCallLog } from "../chatMessage.model";
+import {
+  bookAppointmentTool,
+  cancelAppointmentTool,
+  getLabReportStatus,
+  getMyAppointments,
+  getQueueStatus,
+  rescheduleAppointmentTool,
+} from "./appointment.tools";
+import { getAvailableSlots, getTestPreparation, searchDoctors } from "./doctor.tools";
+import { listMyPatients, registerPatientTool, startVerificationTool, verifyCodeTool } from "./identity.tools";
 import { getHospitalInfo, listDepartments, requestHuman } from "./info.tools";
 import type { AssistantTool, ToolContext } from "./types";
 
 /** Every tool the assistant may call. Order = how they are listed to the model. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each tool has its own argument schema
-export const ASSISTANT_TOOLS: AssistantTool<any>[] = [getHospitalInfo, listDepartments, requestHuman];
+export const ASSISTANT_TOOLS: AssistantTool<any>[] = [
+  getHospitalInfo,
+  listDepartments,
+  searchDoctors,
+  getAvailableSlots,
+  getTestPreparation,
+  startVerificationTool,
+  verifyCodeTool,
+  listMyPatients,
+  registerPatientTool,
+  bookAppointmentTool,
+  getMyAppointments,
+  cancelAppointmentTool,
+  rescheduleAppointmentTool,
+  getQueueStatus,
+  getLabReportStatus,
+  requestHuman,
+];
 
 const byName = new Map(ASSISTANT_TOOLS.map((t) => [t.name, t]));
 
