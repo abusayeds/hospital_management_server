@@ -2,6 +2,7 @@ import express from "express";
 import { WebChatRoutes } from "../modules/assistant/web.route";
 import { KnowledgeRoutes } from "../modules/knowledge/knowledge.route";
 import { AssistantAdminRoutes } from "../modules/assistant/admin.route";
+import { InboxRoutes } from "../modules/assistant/inbox.route";
 import { WhatsAppWebhookRoutes } from "../modules/assistant/channels/whatsapp/webhook.route";
 import { AuditRoutes } from "../modules/audit/audit.route";
 import { AuthRoutes } from "../modules/auth/auth.route";
@@ -58,6 +59,7 @@ const moduleRoutes: { path: string; route: express.Router }[] = [
   { path: "/assistant/web", route: WebChatRoutes },
   { path: "/knowledge", route: KnowledgeRoutes },
   { path: "/assistant/admin", route: AssistantAdminRoutes },
+  { path: "/assistant/inbox", route: InboxRoutes },
   { path: "/webhooks/whatsapp", route: WhatsAppWebhookRoutes },
 ];
 

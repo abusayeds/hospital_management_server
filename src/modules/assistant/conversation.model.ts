@@ -43,6 +43,7 @@ export interface IConversation {
   handoverAt?: Date | null;
   takenOverAt?: Date | null;
   lastStaffReplyAt?: Date | null;
+  remindedAt?: Date | null; // last "patient is waiting" reminder to staff
   notes: { text: string; by: Types.ObjectId; byName: string; at: Date }[];
   pendingAction?: PendingAction | null;
   lastMessageAt: Date;
@@ -78,6 +79,7 @@ const ConversationSchema = new Schema<IConversation>(
     handoverAt: { type: Date, default: null },
     takenOverAt: { type: Date, default: null },
     lastStaffReplyAt: { type: Date, default: null },
+    remindedAt: { type: Date, default: null },
     notes: {
       type: [
         new Schema(

@@ -1,0 +1,124 @@
+import { setAiProvider } from "../../src/ai/ai.service";
+import { AuditLogModel } from "../../src/modules/audit/auditLog.model";
+import { setWhatsAppTransport } from "../../src/modules/assistant/channels/whatsapp/client";
+import { ChatMessageModel } from "../../src/modules/assistant/chatMessage.model";
+import { ConversationModel } from "../../src/modules/assistant/conversation.model";
+import { handleInbound } from "../../src/modules/assistant/engine";
+import { remindIdleTakeovers } from "../../src/modules/assistant/inbox.service";
+import { clearSettingsCache } from "../../src/modules/hospital/settings/settings.service";
+import { scriptedProvider } from "../assistant-fakes";
+import { createUser, signIn, useTestDatabase } from "../helpers";
+
+const WEB = "a1".repeat(16);
+
+describe("Staff inbox", () => {
+  useTestDatabase();
+  beforeEach(() => clearSettingsCache());
+  afterEach(() => {
+    setAiProvider(undefined);
+    setWhatsAppTransport(null);
+  });
+
+  const reception = async () => {
+    await createUser({ role: "reception", email: "rec@test.local" });
+    return signIn("rec@test.local");
+  };
+
+  it("emergencies are listed first and counted in the summary", async () => {
+    setAiProvider(scriptedProvider([() => ({ text: "ok" })]).provider);
+    await handleInbound({ channel: "web", channelUserId: WEB, text: "hello" });
+    await handleInbound({ channel: "web", channelUserId: "b2".repeat(16), text: "বুকে প্রচুর ব্যথা" });
+    const rec = await reception();
+
+    const list = await rec.get("/api/v1/assistant/inbox/conversations?filter=all");
+    expect(list.body.data[0]).toMatchObject({ emergency: true, status: "needs_human", tags: ["EMERGENCY"] });
+    const summary = await rec.get("/api/v1/assistant/inbox/summary");
+    expect(summary.body.data).toMatchObject({ needsHuman: 1, emergency: 1 });
+  });
+
+  it("take over silences the assistant, staff replies go to the patient, hand back resumes the bot (all audited)", async () => {
+    const fake = scriptedProvider([() => ({ text: "bot answer" })]);
+    setAiProvider(fake.provider);
+    const first = await handleInbound({ channel: "web", channelUserId: WEB, text: "I need help" });
+    const id = String(first.conversation._id);
+    const rec = await reception();
+
+    const taken = await rec.post(`/api/v1/assistant/inbox/conversations/${id}/takeover`);
+    expect(taken.body.data.conversation).toMatchObject({
+      status: "human_active",
+      assignedTo: { name: expect.any(String) },
+    });
+
+    const callsBefore = fake.calls.length;
+    const silent = await handleInbound({ channel: "web", channelUserId: WEB, text: "hello?" });
+    expect(silent.messages).toEqual([]);
+    expect(fake.calls.length).toBe(callsBefore);
+
+    const reply = await rec.post(`/api/v1/assistant/inbox/conversations/${id}/reply`).send({ text: "আমি দেখছি।" });
+    expect(reply.body.data).toMatchObject({ sender: "staff", text: "আমি দেখছি।", staffName: expect.any(String) });
+
+    await rec.post(`/api/v1/assistant/inbox/conversations/${id}/handback`);
+    const back = await handleInbound({ channel: "web", channelUserId: WEB, text: "thanks" });
+    expect(back.messages[0]).toMatchObject({ text: "bot answer" });
+
+    const events = (await AuditLogModel.find({ entityType: "Conversation", action: "UPDATE" }).lean()).map(
+      (a) => (a.meta as { event: string }).event,
+    );
+    expect(events).toEqual(expect.arrayContaining(["takeover", "staff_reply", "hand_back"]));
+  });
+
+  it("opening a conversation shows the transcript with tool-call chips and marks it read", async () => {
+    setAiProvider(
+      scriptedProvider([
+        () => ({ toolCalls: [{ name: "list_departments", args: {} }] }),
+        () => ({ text: "Here are our departments." }),
+      ]).provider,
+    );
+    const r = await handleInbound({ channel: "web", channelUserId: WEB, text: "departments?" });
+    const rec = await reception();
+    const res = await rec.get(`/api/v1/assistant/inbox/conversations/${r.conversation._id}`);
+    const bot = res.body.data.messages.find((m: { sender: string }) => m.sender === "bot");
+    expect(bot.toolCalls[0]).toMatchObject({ name: "list_departments", success: true });
+    expect((await ConversationModel.findById(r.conversation._id))?.unreadCount).toBe(0);
+  });
+
+  it("a WhatsApp reply outside the 24-hour window is refused with a clear message", async () => {
+    setAiProvider(scriptedProvider([() => ({ text: "ok" })]).provider);
+    setWhatsAppTransport({ name: "meta", send: async () => ({ ok: true, messageId: "wamid.X" }) });
+    const r = await handleInbound({
+      channel: "whatsapp",
+      channelUserId: "8801711000009",
+      text: "hi",
+      externalMessageId: "w1",
+    });
+    await ConversationModel.updateOne(
+      { _id: r.conversation._id },
+      { $set: { lastInboundAt: new Date(Date.now() - 26 * 3600e3) } },
+    );
+    const rec = await reception();
+    const res = await rec
+      .post(`/api/v1/assistant/inbox/conversations/${r.conversation._id}/reply`)
+      .send({ text: "hello" });
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toContain("24 hours");
+  });
+
+  it("reminds staff once when a patient waits in a taken-over chat", async () => {
+    const conv = await ConversationModel.create({
+      channel: "web",
+      channelUserId: WEB,
+      status: "human_active",
+      takenOverAt: new Date(Date.now() - 20 * 60_000),
+      lastInboundAt: new Date(Date.now() - 10 * 60_000),
+    });
+    expect(await remindIdleTakeovers()).toBe(1);
+    expect(await remindIdleTakeovers()).toBe(0);
+    await ChatMessageModel.deleteMany({ conversation: conv._id });
+  });
+
+  it("roles without inbox:manage cannot open the inbox", async () => {
+    await createUser({ role: "pharmacist", email: "ph@test.local" });
+    const ph = await signIn("ph@test.local");
+    expect((await ph.get("/api/v1/assistant/inbox/conversations")).status).toBe(403);
+  });
+});

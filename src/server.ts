@@ -6,6 +6,7 @@ import { connectDatabase, disconnectDatabase } from "./config/database";
 import { seedReferenceData } from "./DB";
 import { ensureVectorIndex } from "./modules/knowledge/retrieval";
 import { isAiConfigured } from "./ai/ai.service";
+import { remindIdleTakeovers } from "./modules/assistant/inbox.service";
 import { drainEvents } from "./events/bus";
 import { closePdfBrowser } from "./documents/pdf";
 import { closeSocketIO, initSocketIO } from "./sockets";
@@ -19,6 +20,9 @@ async function main() {
   await seedReferenceData();
   // Knowledge search: create the Atlas Vector Search index in the background (text search works without it)
   if (isAiConfigured()) void ensureVectorIndex();
+  // Inbox: remind staff about patients waiting in taken-over chats (checked every minute)
+  const reminder = setInterval(() => void remindIdleTakeovers().catch(() => undefined), 60_000);
+  reminder.unref();
 
   initSocketIO(server);
   server.listen(env.PORT, () => {
