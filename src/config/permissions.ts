@@ -68,7 +68,7 @@ export const PERMISSIONS = {
   "report:operations": "Operational reports and live overview",
   "dashboard:read": "Own role dashboard",
   // Patient assistant (hand-offs to staff)
-  "assistant_chat:manage": "See and resolve assistant hand-offs",
+  "inbox:manage": "Staff inbox: read assistant conversations, take over, reply and resolve",
   // Administration
   "user:manage": "Create and manage staff accounts",
   "settings:manage": "Hospital settings",
@@ -92,6 +92,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "audit:read",
     "automation:manage",
     "report:operations",
+    "inbox:manage",
   ],
   // Read-only analytics. Cannot edit medical records.
   management: [
@@ -117,7 +118,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "doctor:read",
     "bill:read",
     "bill:collect",
-    "assistant_chat:manage",
+    "inbox:manage",
     "lab_order:read",
     "lab_report:deliver",
   ],

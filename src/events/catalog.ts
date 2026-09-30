@@ -51,6 +51,10 @@ export type DomainEventMap = {
   };
   "lab.sample_collected": { labOrderId: Id; patientId: Id };
   "lab.report_ready": { labOrderId: Id; patientId: Id; doctorId: Id | null; visitId: Id | null };
+  // Patient assistant (Phase 5)
+  "chat.message_received": { conversationId: Id; channel: string };
+  "chat.booking_created": { conversationId: Id; appointmentId: Id; patientId: Id; channel: string };
+  "chat.handover_requested": { conversationId: Id; channel: string; reason: string; emergency: boolean };
 };
 
 export type DomainEventName = keyof DomainEventMap;
@@ -66,6 +70,9 @@ export const DOMAIN_EVENT_NAMES = [
   "lab.order_created",
   "lab.sample_collected",
   "lab.report_ready",
+  "chat.message_received",
+  "chat.booking_created",
+  "chat.handover_requested",
 ] as const satisfies readonly DomainEventName[];
 
 export type DomainEvent<N extends DomainEventName = DomainEventName> = {

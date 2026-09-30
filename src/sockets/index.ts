@@ -3,6 +3,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { env } from "../config/env";
 import { Permission, permissionsForRole } from "../config/permissions";
 import { ACCESS_COOKIE, readCookie, verifyAccessToken } from "../modules/auth/tokens";
+import { WEB_CHAT_COOKIE } from "../modules/assistant/channels/web.channel";
 import { DoctorModel } from "../modules/hospital/doctor/doctor.model";
 import { isValidDisplayKey } from "../modules/hospital/queue/display-key";
 import { IUser, UserModel } from "../modules/users/user.model";
@@ -16,6 +17,8 @@ let io: SocketIOServer | null = null;
  *    plus "user:<id>"; a doctor also joins "doctor:<doctorId>" for their own queue
  *  - the waiting-room TV (handshake auth.displayKey): the "display" room only —
  *    it receives data-free "something changed" signals and fetches masked data itself
+ *  - a web-chat visitor (anonymous "tl_chat" cookie): "webchat:<session>" only — staff replies
+ *    to THEIR conversation arrive live
  *  - anyone else: no rooms, hears nothing
  * So an event with patient details only ever reaches people allowed to see it.
  */
@@ -30,6 +33,8 @@ export const initSocketIO = (server: HttpServer): SocketIOServer => {
         socket.data.display = true;
         return next();
       }
+      const chatSession = readCookie(socket.handshake.headers.cookie, WEB_CHAT_COOKIE);
+      if (chatSession && /^[a-f0-9]{32}$/.test(chatSession)) socket.data.webChat = chatSession;
       const token = readCookie(socket.handshake.headers.cookie, ACCESS_COOKIE);
       if (token) {
         const payload = verifyAccessToken(token);
@@ -57,6 +62,7 @@ export const initSocketIO = (server: HttpServer): SocketIOServer => {
       permissions.forEach((p) => socket.join(`perm:${p}`));
     }
     if (socket.data.doctorId) socket.join(`doctor:${socket.data.doctorId}`);
+    if (socket.data.webChat) socket.join(`webchat:${socket.data.webChat}`);
     logger.debug(
       { socketId: socket.id, authenticated: Boolean(socket.data.userId), display: Boolean(socket.data.display) },
       "Socket connected",

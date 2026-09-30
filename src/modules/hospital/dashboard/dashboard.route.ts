@@ -7,7 +7,7 @@ import validateRequest from "../../../middlewares/validateRequest";
 import catchAsync from "../../../utils/catchAsync";
 import { addDays, DATE_PATTERN, startOfDhakaDay, todayInDhaka } from "../../../utils/date";
 import sendResponse from "../../../utils/sendResponse";
-import { ChatSessionModel } from "../../ai/chat/chat.model";
+import { ConversationModel } from "../../assistant/conversation.model";
 import { AppointmentModel } from "../appointment/appointment.model";
 import { getTodayBoard } from "../queue/queue.service";
 
@@ -106,9 +106,9 @@ const getStats = async (date: string) => {
   const dayStart = startOfDhakaDay(date);
   const dayEnd = startOfDhakaDay(addDays(date, 1));
   const [chatSessions, emergencies, pendingHandoffs] = await Promise.all([
-    ChatSessionModel.countDocuments({ createdAt: { $gte: dayStart, $lt: dayEnd } }),
-    ChatSessionModel.countDocuments({ emergency: true, updatedAt: { $gte: dayStart, $lt: dayEnd } }),
-    ChatSessionModel.countDocuments({ needsHuman: true }),
+    ConversationModel.countDocuments({ lastMessageAt: { $gte: dayStart, $lt: dayEnd } }),
+    ConversationModel.countDocuments({ emergency: true, updatedAt: { $gte: dayStart, $lt: dayEnd } }),
+    ConversationModel.countDocuments({ status: "needs_human" }),
   ]);
 
   const byStatus = toCountMap(facets.byStatus);

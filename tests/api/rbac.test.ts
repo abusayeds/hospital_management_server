@@ -9,10 +9,10 @@ const FORBIDDEN: [Role, "get" | "post", string][] = [
   ["doctor", "get", "/api/v1/users"],
   ["nurse", "get", "/api/v1/users"],
   ["lab_technician", "get", "/api/v1/appointments?date=2026-01-01"],
-  ["pharmacist", "get", "/api/v1/chat/sessions"],
+  ["pharmacist", "get", "/api/v1/lab-orders/board"],
   ["accounts", "get", "/api/v1/dashboard/stats"],
   ["patient", "get", "/api/v1/appointments?date=2026-01-01"],
-  ["super_admin", "get", "/api/v1/chat/sessions"],
+  ["super_admin", "get", "/api/v1/visits/today"],
 ];
 
 describe("Role-based access control", () => {

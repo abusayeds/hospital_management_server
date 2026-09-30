@@ -3,7 +3,7 @@ import { z } from "zod";
 import { env } from "../config/env";
 import AppError from "../errors/AppError";
 import { logger } from "../utils/logger";
-import { AiProvider, RetryableAiError } from "./provider";
+import { AiChatRequest, AiChatResponse, AiProvider, RetryableAiError } from "./provider";
 import { createGeminiProvider } from "./providers/gemini";
 import { AiUsageModel } from "./usage.model";
 
@@ -41,7 +41,10 @@ const buildProvider = (): AiProvider | null => {
   const key = env.AI_API_KEY ?? env.GEMINI_API_KEY;
   if (!key) return null;
   const first = env.AI_MODEL ?? env.GEMINI_MODEL;
-  return createGeminiProvider(key, [first, ...env.GEMINI_FALLBACK_MODELS.filter((m) => m !== first)]);
+  return createGeminiProvider(key, [first, ...env.GEMINI_FALLBACK_MODELS.filter((m) => m !== first)], {
+    embeddingModel: env.AI_EMBEDDING_MODEL,
+    embeddingDimensions: env.AI_EMBEDDING_DIMENSIONS,
+  });
 };
 
 export const getAiProvider = (): AiProvider | null => {
@@ -175,3 +178,91 @@ export const generateStructured = async <I, O>(opts: RunOptions<I, O>): Promise<
     ? new AppError(502, "The AI answer could not be used. Try again.", "AI_INVALID_OUTPUT")
     : new AppError(503, "The AI service is not available right now.", "AI_UNAVAILABLE");
 };
+
+// ------------------------------------------------------------------ tool calling (assistant)
+
+type LogCtx = { feature: string; promptVersion: string; userId?: string; entityId?: string };
+
+const logUsage = (
+  provider: AiProvider,
+  ctx: LogCtx,
+  started: number,
+  inputChars: number,
+  status: "ok" | "timeout" | "invalid_output" | "error",
+  extra: Record<string, unknown> = {},
+) =>
+  AiUsageModel.create({
+    feature: ctx.feature,
+    provider: provider.name,
+    promptVersion: ctx.promptVersion,
+    status,
+    latencyMs: Date.now() - started,
+    inputChars,
+    user: ctx.userId && Types.ObjectId.isValid(ctx.userId) ? ctx.userId : null,
+    entityId: ctx.entityId ?? null,
+    ...extra,
+  }).catch((err: unknown) => logger.error({ err }, "Failed to write AI usage log"));
+
+/**
+ * ONE model round with tools (the caller runs the loop and executes the tools).
+ * Same guarantees as generateStructured: timeout, one retry for overload, usage row per call,
+ * and only safe AppErrors come out (AI_NOT_CONFIGURED / AI_UNAVAILABLE).
+ */
+export const chatRound = async (req: Omit<AiChatRequest, "signal">, ctx: LogCtx): Promise<AiChatResponse> => {
+  const provider = getAiProvider();
+  if (!provider?.chat)
+    throw new AppError(503, "The assistant's AI is not configured on this server.", "AI_NOT_CONFIGURED");
+  const inputChars = req.system.length + JSON.stringify(req.turns).length;
+  const started = Date.now();
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await withTimeout((signal) => provider.chat!({ ...req, signal }), aiSettings.timeoutMs);
+      await logUsage(provider, ctx, started, inputChars, "ok", {
+        model: res.model,
+        outputChars: res.text.length + JSON.stringify(res.toolCalls).length,
+        inputTokens: res.usage?.inputTokens ?? null,
+        outputTokens: res.usage?.outputTokens ?? null,
+      });
+      return res;
+    } catch (err) {
+      if (err instanceof AiTimeout) {
+        await logUsage(provider, ctx, started, inputChars, "timeout");
+        throw new AppError(503, "The AI service took too long.", "AI_UNAVAILABLE");
+      }
+      if (err instanceof RetryableAiError && attempt === 1) continue;
+      await logUsage(provider, ctx, started, inputChars, "error", {
+        error: String((err as Error).message).slice(0, 300),
+      });
+      throw new AppError(503, "The AI service is not available right now.", "AI_UNAVAILABLE");
+    }
+  }
+  throw new AppError(503, "The AI service is not available right now.", "AI_UNAVAILABLE");
+};
+
+/** Embeddings for the knowledge base. Returns null when the provider cannot embed (caller falls back). */
+export const embedTexts = async (
+  texts: string[],
+  ctx: LogCtx & { purpose: "document" | "query" },
+): Promise<{ vectors: number[][]; model: string } | null> => {
+  const provider = getAiProvider();
+  if (!provider?.embed || !texts.length) return null;
+  const inputChars = texts.reduce((n, t) => n + t.length, 0);
+  const started = Date.now();
+  try {
+    const res = await withTimeout(
+      (signal) => provider.embed!(texts, { signal, purpose: ctx.purpose }),
+      aiSettings.timeoutMs,
+    );
+    await logUsage(provider, ctx, started, inputChars, "ok", { model: res.model, outputChars: 0 });
+    return res.vectors.length === texts.length ? res : null;
+  } catch (err) {
+    await logUsage(provider, ctx, started, inputChars, err instanceof AiTimeout ? "timeout" : "error", {
+      error: String((err as Error).message).slice(0, 300),
+    });
+    return null;
+  }
+};
+
+/** AI calls made today for a feature (the assistant's daily budget guard) */
+export const aiCallsToday = (feature: string, since: Date) =>
+  AiUsageModel.countDocuments({ feature, createdAt: { $gte: since } });

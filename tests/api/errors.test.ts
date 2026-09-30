@@ -11,16 +11,16 @@ describe("API error format", () => {
 
   it("$gt injection is stripped and then rejected by validation → 400", async () => {
     const res = await request(app)
-      .post("/api/v1/chat/message")
-      .send({ message: { $gt: "" } });
+      .post("/api/v1/assistant/web/messages")
+      .send({ text: { $gt: "" } });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe("VALIDATION_ERROR");
-    expect(res.body.error.details[0].path).toBe("body.message");
+    expect(res.body.error.details[0].path).toBe("body.text");
   });
 
   it("malformed JSON → 400 INVALID_JSON", async () => {
     const res = await request(app)
-      .post("/api/v1/chat/message")
+      .post("/api/v1/assistant/web/messages")
       .set("Content-Type", "application/json")
       .send("{ not json");
     expect(res.status).toBe(400);

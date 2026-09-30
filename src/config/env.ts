@@ -98,6 +98,10 @@ const envSchema = z.object({
   AI_MODEL: optionalString, // falls back to GEMINI_MODEL; GEMINI_FALLBACK_MODELS are tried next
   AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(20000),
   AI_MAX_INPUT_CHARS: z.coerce.number().int().min(1000).max(100000).default(12000),
+  // Knowledge base search (Phase 5). Atlas Vector Search index name; empty embeddings = text search only.
+  AI_EMBEDDING_MODEL: z.string().default("gemini-embedding-001"),
+  AI_EMBEDDING_DIMENSIONS: z.coerce.number().int().min(64).max(3072).default(768),
+  KNOWLEDGE_VECTOR_INDEX: z.string().default("knowledge_vector_index"),
 
   GEMINI_API_KEY: optionalString,
   GEMINI_MODEL: z.string().default("gemini-flash-latest"),
