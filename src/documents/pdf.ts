@@ -6,8 +6,7 @@ import AppError from "../errors/AppError";
 import { logger } from "../utils/logger";
 
 /**
- * PDF RENDERING — HTML in, PDF out, using headless Chrome (Puppeteer).
- *
+
  * Why a browser: Bangla needs proper text shaping (conjuncts like "ক্ষ", vowel signs placed
  * before the consonant). Chrome's shaping engine does this correctly; simple PDF libraries do not.
  * The Hind Siliguri font is embedded in the HTML (base64), so no network is needed and the
