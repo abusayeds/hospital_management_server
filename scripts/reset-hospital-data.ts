@@ -26,6 +26,11 @@ const HOSPITAL_COLLECTIONS = [
   "prescriptiontemplates",
   "aisummaries",
   "domainevents",
+  "conversations",
+  "chatmessages",
+  "verifications",
+  "knowledgearticles",
+  "knowledgechunks",
 ];
 
 const run = async () => {

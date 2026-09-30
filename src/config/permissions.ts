@@ -69,6 +69,7 @@ export const PERMISSIONS = {
   "dashboard:read": "Own role dashboard",
   // Patient assistant (hand-offs to staff)
   "inbox:manage": "Staff inbox: read assistant conversations, take over, reply and resolve",
+  "knowledge:manage": "Edit and publish the assistant's knowledge base",
   // Administration
   "user:manage": "Create and manage staff accounts",
   "settings:manage": "Hospital settings",
@@ -93,6 +94,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "automation:manage",
     "report:operations",
     "inbox:manage",
+    "knowledge:manage",
   ],
   // Read-only analytics. Cannot edit medical records.
   management: [

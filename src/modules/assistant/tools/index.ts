@@ -13,12 +13,14 @@ import {
 import { getAvailableSlots, getTestPreparation, searchDoctors } from "./doctor.tools";
 import { listMyPatients, registerPatientTool, startVerificationTool, verifyCodeTool } from "./identity.tools";
 import { getHospitalInfo, listDepartments, requestHuman } from "./info.tools";
+import { searchKnowledgeBase } from "./knowledge.tools";
 import type { AssistantTool, ToolContext } from "./types";
 
 /** Every tool the assistant may call. Order = how they are listed to the model. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each tool has its own argument schema
 export const ASSISTANT_TOOLS: AssistantTool<any>[] = [
   getHospitalInfo,
+  searchKnowledgeBase,
   listDepartments,
   searchDoctors,
   getAvailableSlots,
@@ -35,6 +37,9 @@ export const ASSISTANT_TOOLS: AssistantTool<any>[] = [
   getLabReportStatus,
   requestHuman,
 ];
+
+// Tools with side effects are not run from the admin's "test the assistant" panel
+const PREVIEW_BLOCKED = new Set(["request_human", "start_verification", "verify_code"]);
 
 const byName = new Map(ASSISTANT_TOOLS.map((t) => [t.name, t]));
 
@@ -82,6 +87,8 @@ export const runTool = async (call: AiToolCall, ctx: ToolContext): Promise<{ res
       false,
       "invalid arguments",
     );
+  if (ctx.preview && PREVIEW_BLOCKED.has(tool.name))
+    return finish({ error: "Not available in the test panel." }, false, "blocked in preview");
   if (tool.needsVerification && !ctx.conversation.verifiedPhone)
     return finish(
       {

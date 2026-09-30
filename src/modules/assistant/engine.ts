@@ -148,7 +148,12 @@ const dedupeUi = (ui: OutboundMessage[]) => {
 
 type AiOutcome = { messages: OutboundMessage[]; toolLogs: ToolCallLog[]; model?: string; flags: string[] };
 
-const runAssistant = async (conv: ConversationDocument, userText: string, inboundId: unknown): Promise<AiOutcome> => {
+const runAssistant = async (
+  conv: ConversationDocument,
+  userText: string,
+  inboundId: unknown,
+  preview = false,
+): Promise<AiOutcome> => {
   const s = await getSettings();
   const today = todayInDhaka();
   const system = buildAssistantSystemPrompt({
@@ -161,8 +166,9 @@ const runAssistant = async (conv: ConversationDocument, userText: string, inboun
     identity: await identityLine(conv),
     summary: conv.runningSummary || undefined,
   });
-  const turns: AiTurn[] = [...(await memoryTurns(conv, inboundId)), { role: "user", text: userText }];
-  const ctx: ToolContext = { conversation: conv, ui: [], bookedAppointmentIds: [] };
+  const history = preview ? [] : await memoryTurns(conv, inboundId);
+  const turns: AiTurn[] = [...history, { role: "user", text: userText }];
+  const ctx: ToolContext = { conversation: conv, ui: [], bookedAppointmentIds: [], preview };
   const toolLogs: ToolCallLog[] = [];
   const logCtx = { feature: "assistant", promptVersion: ASSISTANT_PROMPT_VERSION, entityId: String(conv._id) };
   let model: string | undefined;
@@ -190,7 +196,7 @@ const runAssistant = async (conv: ConversationDocument, userText: string, inboun
 
   // Too many rounds: stop politely and ask a human to look
   logger.warn({ conversationId: String(conv._id) }, "Assistant hit the tool-round limit");
-  await requestHandover(conv, "Assistant could not finish the request");
+  if (!preview) await requestHandover(conv, "Assistant could not finish the request");
   return {
     messages: [
       ...dedupeUi(ctx.ui),
@@ -367,4 +373,24 @@ export const handleInbound = async (inbound: InboundMessage): Promise<EngineResu
     void refreshSummary(fresh);
 
   return { conversation: fresh, messages: outcome.messages, stored };
+};
+
+/**
+ * "Test the assistant" (knowledge base admin): the same prompt, tools and guard, but on a throw-away
+ * conversation — nothing is stored, and tools with side effects (verification, handover, bookings)
+ * are disabled.
+ */
+export const previewAnswer = async (question: string) => {
+  const conv = new ConversationModel({
+    channel: "web",
+    channelUserId: "preview",
+    status: "bot_active",
+  }) as ConversationDocument;
+  const outcome = await runAssistant(conv, question, null, true);
+  return {
+    messages: outcome.messages,
+    toolCalls: outcome.toolLogs,
+    flags: outcome.flags,
+    model: outcome.model ?? null,
+  };
 };

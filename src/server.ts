@@ -4,6 +4,8 @@ import http from "http";
 import app from "./app";
 import { connectDatabase, disconnectDatabase } from "./config/database";
 import { seedReferenceData } from "./DB";
+import { ensureVectorIndex } from "./modules/knowledge/retrieval";
+import { isAiConfigured } from "./ai/ai.service";
 import { drainEvents } from "./events/bus";
 import { closePdfBrowser } from "./documents/pdf";
 import { closeSocketIO, initSocketIO } from "./sockets";
@@ -15,6 +17,8 @@ let shuttingDown = false;
 async function main() {
   await connectDatabase();
   await seedReferenceData();
+  // Knowledge search: create the Atlas Vector Search index in the background (text search works without it)
+  if (isAiConfigured()) void ensureVectorIndex();
 
   initSocketIO(server);
   server.listen(env.PORT, () => {

@@ -1,5 +1,6 @@
 import express from "express";
 import { WebChatRoutes } from "../modules/assistant/web.route";
+import { KnowledgeRoutes } from "../modules/knowledge/knowledge.route";
 import { AuditRoutes } from "../modules/audit/audit.route";
 import { AuthRoutes } from "../modules/auth/auth.route";
 import { managementRoutes } from "../modules/basic_modules/management/management.route";
@@ -53,6 +54,7 @@ const moduleRoutes: { path: string; route: express.Router }[] = [
   { path: "/display", route: DisplayRoutes },
   { path: "/dashboard", route: DashboardRoutes },
   { path: "/assistant/web", route: WebChatRoutes },
+  { path: "/knowledge", route: KnowledgeRoutes },
 ];
 
 moduleRoutes.forEach(({ path, route }) => router.use(path, route));

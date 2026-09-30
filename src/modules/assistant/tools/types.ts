@@ -13,6 +13,7 @@ export type ToolContext = {
   conversation: ConversationDocument;
   ui: OutboundMessage[];
   bookedAppointmentIds: string[];
+  preview?: boolean; // admin "test the assistant": no side effects
 };
 
 export type ToolOutput = { data: unknown; summary: string; ui?: OutboundMessage[] };

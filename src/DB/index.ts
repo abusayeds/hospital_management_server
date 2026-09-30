@@ -4,6 +4,7 @@ import { removeLegacyUsers, seedDemoUsers } from "./demoUsers";
 import { linkDemoDoctor, seedHospitalData } from "./hospitalSeed";
 import { seedClinicalHistory } from "./seed-data/clinicalHistory";
 import { seedDemoActivity } from "./seed-data/demoActivity";
+import { seedKnowledge } from "./seed-data/knowledge";
 
 // Runs on every server start: reference data the app needs (idempotent).
 export const seedReferenceData = async () => {
@@ -27,6 +28,8 @@ const seedDatabase = async () => {
     await seedDemoActivity();
     // Visits, vitals, prescriptions and lab orders for the demo doctor (needs the demo accounts)
     await seedClinicalHistory();
+    // Hospital knowledge base for the patient assistant (22 bilingual articles)
+    await seedKnowledge();
   }
 };
 
