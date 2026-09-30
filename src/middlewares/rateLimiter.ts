@@ -10,7 +10,8 @@ export const generalLimiter = rateLimit({
   limit: env.RATE_LIMIT_MAX,
   standardHeaders: "draft-7",
   legacyHeaders: false,
-  skip: (req) => req.path === "/api/v1/health",
+  // Health checks, and Meta's signed webhook calls (many patients share Meta's few IP addresses)
+  skip: (req) => req.originalUrl.startsWith("/api/v1/health") || req.originalUrl.startsWith("/api/v1/webhooks/"),
   message: tooManyRequests("Too many requests. Please slow down and try again shortly."),
 });
 

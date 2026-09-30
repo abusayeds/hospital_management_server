@@ -32,7 +32,9 @@ app.use(
   }),
 );
 
-// 4. Parse bodies, with a size cap so huge payloads cannot exhaust memory
+// 4. Parse bodies, with a size cap so huge payloads cannot exhaust memory.
+// The WhatsApp webhook keeps the RAW body: its HMAC signature is computed over the exact bytes.
+app.use("/api/v1/webhooks/whatsapp", express.raw({ type: "*/*", limit: "1mb" }));
 app.use(express.json({ limit: env.JSON_BODY_LIMIT }));
 app.use(express.urlencoded({ extended: false, limit: env.JSON_BODY_LIMIT }));
 app.use(cookieParser());

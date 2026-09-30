@@ -30,6 +30,7 @@ export interface IChatMessage {
   latencyMs?: number | null;
   model?: string | null;
   guardFlags: string[]; // output guard findings (e.g. "dosage_pattern")
+  channelPayload?: unknown; // what was actually sent to the channel (e.g. WhatsApp JSON) — debugging + simulator
   createdAt?: Date;
 }
 
@@ -70,6 +71,7 @@ const ChatMessageSchema = new Schema<IChatMessage>(
     latencyMs: { type: Number, default: null },
     model: { type: String, default: null },
     guardFlags: { type: [String], default: [] },
+    channelPayload: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );

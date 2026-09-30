@@ -15,3 +15,11 @@ process.env.DNS_SERVERS = "";
 process.env.DEMO_PASSWORD = "";
 process.env.ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 process.env.QUEUE_DISPLAY_KEY = "test-display-key-123";
+// Never call a real AI provider from tests (tests install fake providers where they need one)
+process.env.GEMINI_API_KEY = "";
+process.env.AI_API_KEY = "";
+// WhatsApp "configured" with test values; tests replace the Meta transport, so nothing leaves the machine
+process.env.WHATSAPP_PHONE_NUMBER_ID = "100000000000001";
+process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
+process.env.WHATSAPP_VERIFY_TOKEN = "test-verify-token";
+process.env.WHATSAPP_APP_SECRET = "test-app-secret";

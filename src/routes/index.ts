@@ -1,6 +1,8 @@
 import express from "express";
 import { WebChatRoutes } from "../modules/assistant/web.route";
 import { KnowledgeRoutes } from "../modules/knowledge/knowledge.route";
+import { AssistantAdminRoutes } from "../modules/assistant/admin.route";
+import { WhatsAppWebhookRoutes } from "../modules/assistant/channels/whatsapp/webhook.route";
 import { AuditRoutes } from "../modules/audit/audit.route";
 import { AuthRoutes } from "../modules/auth/auth.route";
 import { managementRoutes } from "../modules/basic_modules/management/management.route";
@@ -55,6 +57,8 @@ const moduleRoutes: { path: string; route: express.Router }[] = [
   { path: "/dashboard", route: DashboardRoutes },
   { path: "/assistant/web", route: WebChatRoutes },
   { path: "/knowledge", route: KnowledgeRoutes },
+  { path: "/assistant/admin", route: AssistantAdminRoutes },
+  { path: "/webhooks/whatsapp", route: WhatsAppWebhookRoutes },
 ];
 
 moduleRoutes.forEach(({ path, route }) => router.use(path, route));
