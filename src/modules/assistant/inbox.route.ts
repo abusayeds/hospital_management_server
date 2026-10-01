@@ -63,6 +63,11 @@ router.post(
   catchAsync(async (req, res) => ok(res, "Handed back to the assistant", await inbox.handBack(req, req.params.id))),
 );
 router.post(
+  "/conversations/:id/unread",
+  validateRequest(idSchema),
+  catchAsync(async (req, res) => ok(res, "Marked as unread", await inbox.markUnread(req, req.params.id))),
+);
+router.post(
   "/conversations/:id/resolve",
   validateRequest(idSchema),
   catchAsync(async (req, res) => ok(res, "Resolved", await inbox.resolve(req, req.params.id))),

@@ -131,4 +131,26 @@ describe("Staff inbox", () => {
     const ph = await signIn("ph@test.local");
     expect((await ph.get("/api/v1/assistant/inbox/conversations")).status).toBe(403);
   });
+
+  it("counts unread patient messages, lists them under Unread, clears them on open, and can mark a chat unread again", async () => {
+    setAiProvider(scriptedProvider([() => ({ text: "ok" })]).provider);
+    await handleInbound({ channel: "web", channelUserId: "c3".repeat(16), text: "বুকে প্রচুর ব্যথা" });
+    await handleInbound({ channel: "web", channelUserId: "c3".repeat(16), text: "এখনই কাউকে দরকার" });
+    const rec = await reception();
+
+    const before = (await rec.get("/api/v1/assistant/inbox/summary")).body.data;
+    expect(before).toMatchObject({ unreadChats: 1, unreadMessages: 2, waitingChats: 1 });
+    const unread = await rec.get("/api/v1/assistant/inbox/conversations?filter=unread");
+    expect(unread.body.data).toHaveLength(1);
+    const id = unread.body.data[0].id as string;
+
+    await rec.get(`/api/v1/assistant/inbox/conversations/${id}`); // opening = read
+    expect((await rec.get("/api/v1/assistant/inbox/summary")).body.data).toMatchObject({ unreadChats: 0, unreadMessages: 0 });
+    expect((await rec.get("/api/v1/assistant/inbox/conversations?filter=unread")).body.data).toHaveLength(0);
+
+    const marked = await rec.post(`/api/v1/assistant/inbox/conversations/${id}/unread`);
+    expect(marked.body.data).toMatchObject({ unreadCount: 1 });
+    expect((await rec.get("/api/v1/assistant/inbox/summary")).body.data.unreadChats).toBe(1);
+    expect(await AuditLogModel.exists({ entityType: "Conversation", "meta.event": "mark_unread" })).toBeTruthy();
+  });
 });

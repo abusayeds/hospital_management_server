@@ -22,8 +22,11 @@ import { notifyInbox } from "./handover";
  */
 
 // "open" = still with staff: waiting for someone (needs_human) or being handled (human_active)
+// "unread" = open chats with patient messages no staff member has opened yet
+const OPEN_STATUSES = ["needs_human", "human_active"];
 export const INBOX_FILTERS = [
   "open",
+  "unread",
   "needs_human",
   "emergency",
   "human_active",
@@ -82,7 +85,8 @@ export const listConversations = async (f: {
 }) => {
   const query: Record<string, unknown> = {};
   if (f.filter === "emergency") query.emergency = true;
-  else if (f.filter === "open") query.status = { $in: ["needs_human", "human_active"] };
+  else if (f.filter === "open") query.status = { $in: OPEN_STATUSES };
+  else if (f.filter === "unread") Object.assign(query, { status: { $in: OPEN_STATUSES }, unreadCount: { $gt: 0 } });
   else if (f.filter !== "all") query.status = f.filter;
   if (f.channel) query.channel = f.channel;
   if (f.q) {
@@ -102,12 +106,29 @@ export const listConversations = async (f: {
 };
 
 export const inboxSummary = async () => {
-  const [needsHuman, emergency, humanActive] = await Promise.all([
+  const [needsHuman, emergency, humanActive, unread, waitingChats] = await Promise.all([
     ConversationModel.countDocuments({ status: "needs_human" }),
     ConversationModel.countDocuments({ emergency: true, status: { $ne: "resolved" } }),
     ConversationModel.countDocuments({ status: "human_active" }),
+    // Unread = patient messages in chats that are with staff, which no staff member has opened yet
+    ConversationModel.aggregate([
+      { $match: { status: { $in: OPEN_STATUSES }, unreadCount: { $gt: 0 } } },
+      { $group: { _id: null, chats: { $sum: 1 }, messages: { $sum: "$unreadCount" } } },
+    ]),
+    // Chats that need a staff member to look: waiting for someone, or with unread patient messages
+    ConversationModel.countDocuments({
+      $or: [{ status: "needs_human" }, { status: "human_active", unreadCount: { $gt: 0 } }],
+    }),
   ]);
-  return { needsHuman, emergency, humanActive, attention: needsHuman + emergency };
+  return {
+    needsHuman,
+    emergency,
+    humanActive,
+    unreadChats: unread[0]?.chats ?? 0,
+    unreadMessages: unread[0]?.messages ?? 0,
+    waitingChats,
+    attention: needsHuman + emergency,
+  };
 };
 
 const loadConv = async (id: string) => {
@@ -284,6 +305,16 @@ export const handBack = async (req: Request, id: string) => {
   await audit(req, c, "hand_back");
   notifyInbox(c);
   return getConversation(req, id);
+};
+
+/** "Mark as unread": keep the chat flagged for a colleague (or for later) after opening it */
+export const markUnread = async (req: Request, id: string) => {
+  const c = await loadConv(id);
+  c.unreadCount = Math.max(c.unreadCount ?? 0, 1);
+  await c.save();
+  await audit(req, c, "mark_unread");
+  notifyInbox(c);
+  return { id: String(c._id), unreadCount: c.unreadCount };
 };
 
 export const resolve = async (req: Request, id: string) => {
