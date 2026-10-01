@@ -791,7 +791,9 @@ rendered normally, but the dry-run transport never calls Meta or a gateway; deli
 5 s. Simulated WhatsApp messages appear in Admin → WhatsApp Simulator (open it with the patient's number and reply
 there). **Real WhatsApp:** set the four `WHATSAPP_*` variables (§14.6), approve templates named like
 `tl_appointment_confirmation` in Meta with the same parameter order, then switch off "Simulate WhatsApp" in
-Automation → Settings. **Preview world** (`POST /automation/preview-world`, admin): replays planners hourly up to a
+Automation → Settings. While testing, fill **"Real WhatsApp only to these numbers"** (`whatsappLiveRecipients`):
+only those phones get real messages, everyone else (the fictional demo patients) stays in the simulator. Meta's free
+**test number** also delivers only to recipients added in the Meta dashboard (API Setup → To, max 5). **Preview world** (`POST /automation/preview-world`, admin): replays planners hourly up to a
 time in the next 24 h, plus queued jobs, and shows who would get what and whether it would send, defer or skip —
 nothing stored.
 

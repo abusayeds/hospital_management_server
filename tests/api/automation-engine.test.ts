@@ -255,6 +255,28 @@ describe("automation engine", () => {
     expect(row!.providerMessageId).toMatch(/^wamid\.SIM\./);
   });
 
+  it("with a live-recipient list, only listed numbers get real WhatsApp; others stay in the simulator", async () => {
+    const [other] = await createPatients(1);
+    await settings({ simulateWhatsApp: false, whatsappLiveRecipients: [patient.phone], dedupeWindowMinutes: 0 });
+    world.set("a1", { valid: true });
+    world.set("a2", { valid: true });
+    await plan("a1");
+    await planJobs(testRule.key, [
+      {
+        dedupeKey: "apt:a2:T-24h",
+        scopeType: "appointment",
+        scopeId: "a2",
+        scheduledFor: DUE,
+        patientId: String(other._id),
+        data: { patientId: String(other._id), phone: other.phone, serial: 2 },
+      },
+    ]);
+    expect(await dispatchDue(NOW())).toMatchObject({ sent: 2 });
+    expect(sends).toHaveLength(1); // only the listed number reached the real sender
+    expect(await OutboxMessageModel.findOne({ toRef: other.phone })).toMatchObject({ simulated: true });
+    expect(await OutboxMessageModel.findOne({ toRef: patient.phone })).toMatchObject({ simulated: false });
+  });
+
   it("a failed send falls back to SMS; with no fallback the job fails with detail and can be retried", async () => {
     setWhatsAppTransport({ name: "meta", send: async () => ({ ok: false, error: "(#131026) Message undeliverable" }) });
     world.set("a1", { valid: true });

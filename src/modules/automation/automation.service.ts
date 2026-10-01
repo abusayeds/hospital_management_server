@@ -541,6 +541,7 @@ export const AUTOMATION_SETTING_KEYS = [
   "dedupeWindowMinutes",
   "simulateWhatsApp",
   "simulateSms",
+  "whatsappLiveRecipients",
   "smsFallbackEnabled",
   "failureAlertThreshold",
 ] as const;

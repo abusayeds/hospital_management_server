@@ -38,6 +38,7 @@ const defaults = (): HospitalSettings => ({
   // Simulation is ON outside production so a demo never messages real phones by accident
   simulateWhatsApp: !isProduction,
   simulateSms: !isProduction,
+  whatsappLiveRecipients: [],
   smsFallbackEnabled: true,
   failureAlertThreshold: 5,
 });

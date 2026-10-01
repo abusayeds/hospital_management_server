@@ -253,11 +253,14 @@ export const sendToPatientPhone = async (input: PatientSend): Promise<SendOutcom
 
   for (const channel of input.channels) {
     if (channel === "whatsapp") {
-      if (!settings.simulateWhatsApp && !isWhatsAppConfigured()) {
+      // Test safety: with a live-recipient list, numbers outside it stay in the simulator
+      const liveList = settings.whatsappLiveRecipients ?? [];
+      const simulate = settings.simulateWhatsApp || (liveList.length > 0 && !liveList.includes(input.phone));
+      if (!simulate && !isWhatsAppConfigured()) {
         attempts.push({ channel, result: "failed", error: "WhatsApp is not configured" });
         continue;
       }
-      const r = await sendWhatsApp(input, settings.simulateWhatsApp, params);
+      const r = await sendWhatsApp(input, simulate, params);
       if (r.outbox) last = r.outbox;
       attempts.push({ channel, result: r.ok ? "sent" : "failed", error: r.ok ? null : r.error });
       if (r.ok) return { outbox: r.outbox, attempts };

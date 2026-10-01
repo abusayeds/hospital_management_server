@@ -48,6 +48,7 @@ const updateSettingsSchema = z.object({
         .max(24 * 60),
       simulateWhatsApp: z.boolean(),
       simulateSms: z.boolean(),
+      whatsappLiveRecipients: z.array(z.string().regex(/^\+8801[3-9]\d{8}$/, "Use +8801XXXXXXXXX")).max(20),
       smsFallbackEnabled: z.boolean(),
       failureAlertThreshold: z.number().int().min(1).max(1000),
     })
