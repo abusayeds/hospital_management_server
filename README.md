@@ -41,7 +41,9 @@ for non-technical staff, and explainable in an interview.
     gender and clinical content). Emergencies in the chat are handled by code, not AI.
 12. **Medical records are never hard-deleted and never silently changed.** Closed visits are read-only;
     corrections are audited addenda. Soft delete (`basePlugin`) everywhere else.
-13. **Demo data is fictional only.**
+13. **No fictional patients.** The seed creates staff accounts, doctors, catalogues, templates and the knowledge
+    base only. Patients are registered by reception with real phone numbers (WhatsApp messages are real — there is no
+    simulator). Never add made-up phone numbers to the database.
 14. The owner develops on **Windows** (PowerShell / Git Bash, `core.autocrlf=true`). Keep commands cross-platform.
 
 ---
@@ -54,8 +56,8 @@ for non-technical staff, and explainable in an interview.
 | 2 — Authentication, roles & permissions, user management, audit log | ✅ done |
 | 3 — Hospital core: master data, patients, scheduling, appointments, live queue | ✅ done |
 | 4 — Clinical: event bus, vitals, visits/EMR, prescriptions + PDF, lab + four-eyes, AI visit summary | ✅ done |
-| 5 — Patient assistant: conversation engine, tools, safety, knowledge base (RAG), web chat + widget, WhatsApp + simulator, staff inbox | ✅ done |
-| 6 — Automation engine: rules, jobs + scheduler, Message Outbox, templates, replies, preferences, simulation | ✅ done |
+| 5 — Patient assistant: conversation engine, tools, safety, knowledge base (RAG), web chat + widget, WhatsApp, staff inbox | ✅ done |
+| 6 — Automation engine: rules, jobs + scheduler, Message Outbox, templates, replies, preferences | ✅ done |
 | **7 — Business & launch (billing, pharmacy, analytics, AI daily report, security hardening, deployment)** | ⏭️ **next** |
 
 Quality gates: **269 tests passing** (`npm test`, includes the 32-scenario chatbot evaluation), `npm run typecheck`
@@ -88,7 +90,7 @@ and `npm run lint` clean, frontend typecheck/lint clean.
 
 | Role (code) | Frontend area | Main jobs |
 | --- | --- | --- |
-| `super_admin` | `/admin` | users, roles, master data, settings, audit log, event log, inbox, knowledge base, channels, WhatsApp simulator |
+| `super_admin` | `/admin` | users, roles, master data, settings, audit log, event log, inbox, knowledge base, automation, channels |
 | `management` | `/management` | live overview, analytics (read-only) |
 | `reception` | `/reception` | registration, appointments, queue, lab report hand-over, **staff inbox** (assistant chats) |
 | `doctor` | `/doctor` | own queue, consultation (EMR, prescriptions, lab orders), AI visit summary |
@@ -118,7 +120,7 @@ cd backend
 npm install
 cp .env.example .env        # fill it in (table below)
 npm run pdf:setup           # downloads headless Chrome for prescription / lab report PDFs (once)
-npm run seed                # master data + demo accounts + demo patients, appointments, clinical history
+npm run seed                # master data + demo staff accounts + knowledge base (no patients)
 npm run dev                 # http://localhost:5000  → GET /api/v1/health
 ```
 
@@ -155,7 +157,7 @@ be read with another. The server **refuses to start** if `.env` is invalid and l
 | `AI_TIMEOUT_MS` / `AI_MAX_INPUT_CHARS` | | 20000 / 12000 | Hard limits per AI call |
 | `AI_EMBEDDING_MODEL` / `AI_EMBEDDING_DIMENSIONS` | | `gemini-embedding-001` / 768 | Knowledge base embeddings |
 | `KNOWLEDGE_VECTOR_INDEX` | | `knowledge_vector_index` | Atlas Vector Search index name (created automatically at start-up on Atlas) |
-| `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_VERIFY_TOKEN` / `WHATSAPP_APP_SECRET` | for WhatsApp | – | All four set = WhatsApp channel on (see §14.6). Empty = off; the simulator still works |
+| `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_VERIFY_TOKEN` / `WHATSAPP_APP_SECRET` | for WhatsApp | – | All four set = WhatsApp channel on (see §14.6). Empty = off (automated WhatsApp messages then fail with a clear reason) |
 | `WHATSAPP_API_VERSION` | | `v21.0` | Graph API version |
 | `DOCUMENT_SIGNING_KEY` | | derived from `JWT_SECRET_KEY` | HMAC key for QR codes on printed documents (changing it invalidates old QRs) |
 | `PUBLIC_APP_URL` | | first `CLIENT_URL` | Site the QR opens (`/verify/<code>`) |
@@ -168,9 +170,8 @@ be read with another. The server **refuses to start** if `.env` is invalid and l
 | --- | --- |
 | `npm run dev` | nodemon + tsx, restarts on changes in `src/` and `.env` |
 | `npm run build` / `npm start` | Compile to `dist/` / run compiled |
-| `npm run seed` | Idempotent: master data, demo accounts, 150 demo patients + 30 days of appointments, clinical history (visits, vitals, prescriptions, lab orders in every status, templates), 22 knowledge articles, 4 demo assistant conversations |
+| `npm run seed` | Idempotent: master data, demo staff accounts, the demo doctor's 5 prescription templates, 22 knowledge articles. **No patients** — register them in Reception with real numbers |
 | `npm run seed:reset` | Drops hospital + clinical collections (not users/audit) and seeds again. Disabled in production |
-| `npm run demo:live` | Simulates a live queue for demos |
 | `npm run pdf:setup` | Downloads headless Chrome for PDFs |
 | `npm run eval:chatbot` | Chatbot evaluation (32 scenarios, Bangla/English/Banglish) on a throw-away in-memory DB with a deterministic mock model; `-- --real` uses the configured AI; `-- --only=id1,id2`; `EVAL_VERBOSE=1` prints transcripts |
 | `npm test` | Jest on an in-memory MongoDB replica set (never touches Atlas); needs `pdf:setup` for the 2 PDF tests |
@@ -216,7 +217,7 @@ routes, the assistant's tools, event consumers, seeds and tests.
 | `middlewares/` | sanitize, verifyOrigin, rate limiters, `validateRequest`, `authenticate`, `authorize` (`requirePermission`, `requireAnyPermission`, `assertCanAccess`), error handlers |
 | `events/` | `catalog.ts` (typed event list), `bus.ts` (publish/subscribe, persisted), `domainEvent.model.ts`, `events.route.ts` |
 | `ai/` | AI layer: `provider.ts` (generate / chat with tools / embed), `providers/gemini.ts`, `ai.service.ts` (`generateStructured`, `chatRound`, `embedTexts`), `deidentify.ts`, `prompts/` (`visit-summary.v1`, `assistant.v1`), `usage.model.ts` |
-| `modules/assistant` | Patient assistant: `engine.ts`, models, `tools/`, `safety/`, `channels/` (web, whatsapp), `inbox.*`, `admin.route.ts` (channels, dev codes, simulator), `web.route.ts` |
+| `modules/assistant` | Patient assistant: `engine.ts`, models, `tools/`, `safety/`, `channels/` (web, whatsapp), `inbox.*`, `admin.route.ts` (channels, test message, dev codes), `web.route.ts` |
 | `modules/knowledge` | Knowledge base: articles/chunks, `retrieval.ts` (chunking, embeddings, vector/text search), admin routes |
 | `documents/` | `pdf.ts` (Puppeteer renderer + embedded font), `signing.ts` (HMAC codes), `verify.route.ts` (public QR check) |
 | `modules/auth`, `users`, `audit` | Phase 2 |
@@ -511,14 +512,13 @@ automation rule (§15). To add an event: extend
 | GET / POST / PUT | `/assistant/inbox/conversations/:id` (+ `/takeover`, `/reply`, `/handback`, `/resolve`, `/tags`, `/notes`) | `inbox:manage` | Conversation + actions (audited) |
 | GET / POST | `/assistant/admin/channels`, `/assistant/admin/channels/whatsapp/test` | `settings:manage` (read also `inbox:manage`) | Channel status, test message |
 | GET | `/assistant/admin/dev-otps` | `settings:manage`/`inbox:manage`, **not in production** | Development verification codes |
-| GET / POST / DELETE | `/assistant/admin/simulator/whatsapp` | `settings:manage` | WhatsApp simulator |
 | GET / POST / PATCH / DELETE | `/knowledge/articles[/:id]` (+ `/publish`, `/unpublish`), POST `/knowledge/reindex`, POST `/knowledge/test` | `knowledge:manage` | Knowledge base + "test the assistant" |
 | GET / PATCH / POST | `/automation/rules`, `/automation/rules/:key` (`{enabled, config}`), `/:key/run`, `/:key/test` (`{phone, language}`) | read: `automation:read`; change: `automation:manage` | Rules, run planner now, test send |
 | GET / PATCH / POST | `/automation/templates?category`, `/automation/templates/:key`, `/:key/rollback` (`{version}`), POST `/automation/templates/preview` | read / manage | Templates, versions, live preview |
 | GET / POST | `/automation/outbox?from&to&channel&status&source&ruleKey&patientId&q&page`, `/outbox/export.csv`, `/outbox/:id`, `/:id/retry`, `/:id/cancel`, `/:id/test` (`{phone}`) | read / manage | Outbox, CSV (phones masked), retry, test copy |
 | GET / POST | `/automation/queue?minutes`, `/automation/jobs?ruleKey&status&from&to`, `/jobs/:id`, `/jobs/:id/cancel`, `/jobs/:id/retry` | read / manage | Scheduled queue and jobs |
 | GET | `/automation/runs?ruleKey&kind&withErrors`, `/automation/health` | `automation:read` | Run log, scheduler health |
-| GET / PATCH | `/automation/settings` | read / manage | Quiet hours, numerals, budget, caps, simulation, SMS fallback |
+| GET / PATCH | `/automation/settings` | read / manage | Quiet hours, numerals, budget, caps, SMS fallback |
 | POST | `/automation/preview-world` (`{at}` within 24 h) | `automation:manage` | Dry run: who would get what |
 | GET | `/automation/patients/:id/messages` | `patient:read_basic` (chats only with `inbox:manage`) | Patient "Messages" tab |
 | PATCH | `/patients/:id/preferences` | `patient:update` | Message preferences (audited) |
@@ -639,8 +639,6 @@ production for the widget). Staff replies arrive on socket room `webchat:<id>`.
   numbered text ("reply 2"), remembered per conversation. Media → polite "text only" + human option.
 - **24-hour window:** free-form messages only within 24 h of the patient's last message (bot replies always are;
   staff replies outside it are refused with a clear message). Template messages = Phase 6.
-- **Simulator** (`/admin/whatsapp-simulator`): builds a real webhook payload and runs it through the same adapter
-  and engine with a capturing transport; outgoing Cloud API payloads are drawn like WhatsApp. Works without Meta.
 
 **Setup step by step**
 1. developers.facebook.com → My Apps → Create app (type *Business*) → add the **WhatsApp** product.
@@ -738,7 +736,7 @@ inbox replies (`staff`), system notices, in-app staff alerts (`channel: inapp`),
 verification codes (stored **masked**). Fields: patient, toType/toRef, channel, messageKind (`session` / `template`
 / `sms` / `inapp`), templateKey + version, variables, **renderedText** (exact text), buttons, status
 (`queued → sending → sent → delivered → read` | `failed` | `cancelled`), providerMessageId, `deliveryUpdates[]`,
-`simulated`, related entity, ruleKey/job, conversation/chatMessage, `replyWindowClosesAt`, `repliedAt`/`replyAction`,
+related entity, ruleKey/job, conversation/chatMessage, `replyWindowClosesAt`, `repliedAt`/`replyAction`,
 `cost` (reserved for Phase 7).
 - `outbox/outbox.service.ts` is the only way automation reaches a patient: WhatsApp inside the **24-hour window** →
   session message with reply buttons (`auto|<action>|<id>`); outside → the approved **template** (name, language,
@@ -784,25 +782,25 @@ An interaction handler runs before the model. Buttons `auto|confirm|<appointment
 - **stop** / typed **STOP** → `optOutAll` for every patient on that phone (audited) + confirmation with how to opt
   back in; **START** → back on. Free text continues in the assistant. WhatsApp retries are ignored (message id).
 
-### 15.7 Simulation mode and preview
+### 15.7 Real WhatsApp only, and the preview tool
 
-Hospital settings `simulateWhatsApp` / `simulateSms` (default **on** outside production): messages are created and
-rendered normally, but the dry-run transport never calls Meta or a gateway; delivered/read are faked after 1.5 s /
-5 s. Simulated WhatsApp messages appear in Admin → WhatsApp Simulator (open it with the patient's number and reply
-there). **Real WhatsApp:** set the four `WHATSAPP_*` variables (§14.6), approve templates named like
-`tl_appointment_confirmation` in Meta with the same parameter order, then switch off "Simulate WhatsApp" in
-Automation → Settings. While testing, fill **"Real WhatsApp only to these numbers"** (`whatsappLiveRecipients`):
-only those phones get real messages, everyone else (the fictional demo patients) stays in the simulator. Meta's free
-**test number** also delivers only to recipients added in the Meta dashboard (API Setup → To, max 5). **Preview world** (`POST /automation/preview-world`, admin): replays planners hourly up to a
-time in the next 24 h, plus queued jobs, and shows who would get what and whether it would send, defer or skip —
-nothing stored.
+There is **no simulation**: every patient message goes to Meta for real (owner decision, 2026-10-01). Automated
+tests replace the transport (`setWhatsAppTransport`, `tests/fake-whatsapp.ts`) so they never reach a phone.
+Set the four `WHATSAPP_*` variables (§14.6) and restart. Meta's free **test number** delivers only to recipients
+added in the Meta dashboard (API Setup → To, max 5); a business number after Meta verification reaches everyone.
+Outside the 24 h window a message needs an approved template (`tl_appointment_confirmation` … with the same
+parameter order); otherwise the SMS fallback is tried — **no SMS gateway is connected yet**, so that attempt is
+recorded as failed ("No SMS gateway connected yet"); connect one with `setSmsProvider()`.
+**Preview world** (`POST /automation/preview-world`, admin): replays planners hourly up to a time in the next 24 h,
+plus queued jobs, and shows who would get what and whether it would send, defer or skip — nothing stored or sent.
 
-### 15.8 Demo data (`npm run seed`)
+### 15.8 Data
 
-`seedAutomationDemo()`: rule rows, templates, demo patient **Rahim Uddin, 01711-000001** with an appointment later
-today (same-day reminder in ~5 min), one tomorrow (confirmation now), a no-show yesterday (rebook offer in 2 min), a
-visit with follow-up in 3 days and a report verified just now; 6 history rows and one **failed** send to practise
-Retry. Runs once (skipped when automation outbox rows exist).
+`npm run seed` creates no patients. To test, register yourself in Reception with your own WhatsApp number (the
+number must also be in Meta's recipient list while using the test number), book, and watch the messages arrive.
+On 2026-10-01 all earlier fictional patients and their appointments, visits, lab orders, chats, messages, jobs and
+the audit/event logs were deleted from the shared Atlas database (backup: `testolify/db-backup-2026-10-01/`, Extended
+JSON per collection, restorable with `mongoimport --jsonArray`).
 
 ### 15.9 Adding a rule
 
@@ -838,7 +836,7 @@ admin API permissions, template validation and rollback, CSV masking, preview wo
   emergency detection in 3 languages (no model call, flagged, still sent during takeover), self-harm wording,
   injection refusal, AI budget, output guard (doses, foreign phones, ids); knowledge publish/unpublish/versioning,
   Bangla/English text search, test panel; WhatsApp verify GET, bad signature 401, retry processed once, button
-  replies, statuses, media, 24-hour window, simulator path, renderer limits; inbox listing, takeover/reply/hand-back
+  replies, statuses, media, 24-hour window, renderer limits; inbox listing, takeover/reply/hand-back
   audit, reminder; the 32-scenario evaluation. Tests never call real providers (Gemini key blanked, Meta transport
   replaced).
 - Every new endpoint: happy path, validation error, 401, 403 (audited), business rules.
@@ -886,8 +884,8 @@ management, CSRF layers. Fixed a data leak: socket events with patient data went
 ### Phase 3 — Hospital core (done)
 Master data screens and APIs, hospital settings, patients (TL codes, duplicate detection, encrypted NID, instant
 search), slot engine, transactional booking with DB-level double-booking protection, reschedule, live queue with
-priorities, TV display with key and announcements, printable patient card and token, demo seed (150 patients,
-30 days).
+priorities, TV display with key and announcements, printable patient card and token, demo seed (originally 150 fictional
+patients — removed on 2026-10-01, see Phase 6).
 
 ### Phase 4 — Clinical (done)
 Owner decisions: commit Phase 3 first; "AI" wording allowed only on staff/doctor screens; docs live only in the
@@ -910,11 +908,11 @@ entirely; the permission became `inbox:manage`; `knowledge:manage` added. Docs s
 docs/ paths); product name Testolife; patient screens say "Testo Life Assistant", never "AI".
 Built: channel-independent engine, 16 tools with server-side authorisation and Confirm step, OTP verification,
 safety layer, knowledge base with vector/text retrieval and admin test panel, web chat + widget, WhatsApp Cloud API
-with signature check, idempotency, limits, 24 h window and a simulator, live staff inbox with take-over, 32-scenario
+with signature check, idempotency, limits, 24 h window, live staff inbox with take-over, 32-scenario
 evaluation, demo seed.
 Decisions: the model never sees real ids (P1/A1 references) or phone numbers; actions are confirmed in code, not by
 the model; emergencies and injection attempts are handled without the model; WhatsApp numbers are verified by
-WhatsApp; the simulator uses the real adapter path (only the transport differs).
+WhatsApp.
 Known limitations: SMS OTP delivery not built (web verification works in development via the dev codes view, and
 over WhatsApp when configured — a WhatsApp OTP to a number outside the 24 h window needs an authentication
 template, Phase 6); Atlas vector index needs an Atlas cluster (text search otherwise); the evaluation's mock model
@@ -928,14 +926,14 @@ Built: rule registry + 13 rules, AutomationJob with unique dedupe keys and lease
 scheduler with start-up catch-up, Message Outbox wrapping every sender (automation, assistant, staff, OTP, tests),
 template system with save-time validation, versions and bn/en preview, 24 h session vs approved template, SMS
 fallback hook, quiet hours / limits / duplicate / preference guards with reasons, reply handling through the
-assistant's own tools, patient preferences + STOP/START, simulation mode with fake delivery, preview world, admin
+assistant's own tools, patient preferences + STOP/START, preview world, admin
 API + UI, patient Messages tab, demo seed, 54 new tests.
 Decisions and why: jobs are PLANNED, not sent, so the queue is visible and preconditions are re-checked at send
 time; the dedupe index (not code) guarantees idempotency; deferral instead of dropping keeps limits safe; the
 message text is rendered at send time from fresh data; replies reuse the Confirm step, so no new booking logic
 exists; essential = only messages about the hospital changing the patient's own booking.
 Known limitations: the SMS provider is a stub (logs only); WhatsApp templates must be approved in Meta with the same
-names/parameter order before switching simulation off; per-phone cap counts by phone (families share it); the
+names/parameter order (until then: messages outside the 24 h window fall back to SMS, which has no gateway yet); per-phone cap counts by phone (families share it); the
 digest is plain numbers (AI narrative in Phase 7); a single scheduler process is assumed for cron cadence (several
 are safe — leases — but each runs the planners).
 
