@@ -23,7 +23,7 @@ for non-technical staff, and explainable in an interview.
    (Some Phase 1–2 commits still carry such trailers; rewriting pushed history is the owner's decision.)
 5. **At the end of every phase**, give the owner (in Bangla): every file created/changed with why; commands to
    run; a manual test checklist (which account, what to check); likely interview questions with short answers.
-   Then update §17 (phase log) here and the matching part of the frontend guide.
+   Then update §18 (phase log) here and the matching part of the frontend guide.
 6. **Two repositories, cloned side by side:** `backend/` → github.com/abusayeds/hospital_management_server and
    `frontend/` → github.com/abusayeds/hospital_management_frontend, in one parent folder, named exactly
    `backend` and `frontend` (`npm run shared:export` writes into `../frontend`). Commit and push in each repo
@@ -55,10 +55,10 @@ for non-technical staff, and explainable in an interview.
 | 3 — Hospital core: master data, patients, scheduling, appointments, live queue | ✅ done |
 | 4 — Clinical: event bus, vitals, visits/EMR, prescriptions + PDF, lab + four-eyes, AI visit summary | ✅ done |
 | 5 — Patient assistant: conversation engine, tools, safety, knowledge base (RAG), web chat + widget, WhatsApp + simulator, staff inbox | ✅ done |
-| **6 — Automation engine (reminders, follow-ups, no-show, report-ready, outbox, automation settings)** | ⏭️ **next** |
-| 7 — Business & launch (billing, pharmacy, analytics, security hardening, deployment) | planned |
+| 6 — Automation engine: rules, jobs + scheduler, Message Outbox, templates, replies, preferences, simulation | ✅ done |
+| **7 — Business & launch (billing, pharmacy, analytics, AI daily report, security hardening, deployment)** | ⏭️ **next** |
 
-Quality gates: **215 tests passing** (`npm test`, includes the 32-scenario chatbot evaluation), `npm run typecheck`
+Quality gates: **269 tests passing** (`npm test`, includes the 32-scenario chatbot evaluation), `npm run typecheck`
 and `npm run lint` clean, frontend typecheck/lint clean.
 
 ---
@@ -311,6 +311,7 @@ Only the visit's own doctor may write it. Lab results reach doctors only after v
 | `master_data:manage` | ✅ | · | · | · | · | · | · | · | · |
 | `doctor:read` | ✅ | ✅ | ✅ | ✅ | ✅ | · | · | · | · |
 | `audit:read` | ✅ | · | · | · | · | · | · | · | · |
+| `automation:read` | ✅ | ✅ | · | · | · | · | · | · | · |
 | `automation:manage` | ✅ | · | · | · | · | · | · | · | · |
 | `portal:own_records` | · | · | · | · | · | · | · | · | ✅ |
 
@@ -437,8 +438,10 @@ shutdown and in tests). Payloads carry **ids and dates only**.
 | `chat.message_received` | conversationId, channel | assistant engine (every patient message) |
 | `chat.booking_created` | conversationId, appointmentId, patientId, channel | assistant Confirm → booking service |
 | `chat.handover_requested` | conversationId, channel, reason, emergency | emergency rule, `request_human`, failures |
+| `doctor.leave_added` | doctorId, from, to | doctor update (a NEW leave that ends today or later) |
 
-Current consumers: `ai-summary-invalidate` (visit.closed, lab.report_ready). To add an event: extend
+Current consumers: `ai-summary-invalidate` (visit.closed, lab.report_ready) and one `automation:<rule>` per
+automation rule (§15). To add an event: extend
 `events/catalog.ts`, publish from the service after commit, document it here.
 
 ---
@@ -510,12 +513,22 @@ Current consumers: `ai-summary-invalidate` (visit.closed, lab.report_ready). To 
 | GET | `/assistant/admin/dev-otps` | `settings:manage`/`inbox:manage`, **not in production** | Development verification codes |
 | GET / POST / DELETE | `/assistant/admin/simulator/whatsapp` | `settings:manage` | WhatsApp simulator |
 | GET / POST / PATCH / DELETE | `/knowledge/articles[/:id]` (+ `/publish`, `/unpublish`), POST `/knowledge/reindex`, POST `/knowledge/test` | `knowledge:manage` | Knowledge base + "test the assistant" |
+| GET / PATCH / POST | `/automation/rules`, `/automation/rules/:key` (`{enabled, config}`), `/:key/run`, `/:key/test` (`{phone, language}`) | read: `automation:read`; change: `automation:manage` | Rules, run planner now, test send |
+| GET / PATCH / POST | `/automation/templates?category`, `/automation/templates/:key`, `/:key/rollback` (`{version}`), POST `/automation/templates/preview` | read / manage | Templates, versions, live preview |
+| GET / POST | `/automation/outbox?from&to&channel&status&source&ruleKey&patientId&q&page`, `/outbox/export.csv`, `/outbox/:id`, `/:id/retry`, `/:id/cancel`, `/:id/test` (`{phone}`) | read / manage | Outbox, CSV (phones masked), retry, test copy |
+| GET / POST | `/automation/queue?minutes`, `/automation/jobs?ruleKey&status&from&to`, `/jobs/:id`, `/jobs/:id/cancel`, `/jobs/:id/retry` | read / manage | Scheduled queue and jobs |
+| GET | `/automation/runs?ruleKey&kind&withErrors`, `/automation/health` | `automation:read` | Run log, scheduler health |
+| GET / PATCH | `/automation/settings` | read / manage | Quiet hours, numerals, budget, caps, simulation, SMS fallback |
+| POST | `/automation/preview-world` (`{at}` within 24 h) | `automation:manage` | Dry run: who would get what |
+| GET | `/automation/patients/:id/messages` | `patient:read_basic` (chats only with `inbox:manage`) | Patient "Messages" tab |
+| PATCH | `/patients/:id/preferences` | `patient:update` | Message preferences (audited) |
 
 **Socket events:** `appointment:updated` (perm `appointment:read`), `queue:updated` (perm `queue:read`, doctor
 room, display), `queue:recall` (display), `vitals:updated` (perm `vitals:read`, doctor room), `visit:updated` /
 `visit:closed` (doctor room), `lab:updated` (perm `lab_order:read`, doctor room), `lab:report_ready` (doctor room),
 `inbox:updated` / `inbox:alert` (perm `inbox:manage`; alert = someone needs a human, `emergency` / `reminder`
-flags), `chat:message` (room `webchat:<session>` — staff replies to that visitor). Payloads are ids/status only
+flags), `chat:message` (room `webchat:<session>` — staff replies to that visitor), `automation:alert` (in-app staff
+alerts, to the rule's permission: digest, failures, waiting chats, emergencies). Payloads are ids/status only
 (except `chat:message`, which goes only to the visitor's own room).
 
 ---
@@ -663,7 +676,149 @@ Jest in CI); `-- --real` evaluates the configured model. Scenarios: `scripts/eva
 
 ---
 
-## 15. Testing
+## 15. Automation engine (Phase 6)
+
+Reminders, follow-ups, no-show offers, report-ready messages and staff alerts — driven by domain events and
+schedules, sent through **one Message Outbox**. Code: `src/modules/automation/`.
+
+### 15.1 How it works
+
+```
+domain event ─┐                         ┌─ guards: rule on? precondition still true? preferences,
+              ├─► rule planner / event ─► AutomationJob ─► dispatcher (lease) ─┤  quiet hours, limits, duplicate
+cron planner ─┘   handler (idempotent)    (scheduled)       every minute       └─► render template ─► Outbox ─► WhatsApp → SMS
+```
+
+- **Rule** (`rules/*.rules.ts`, contract in `rules/types.ts`): key, category, defaults, config schema, `events`
+  and/or `plan` (which jobs SHOULD exist), `prepare` (at SEND time: re-check preconditions, collect variables),
+  `postSend` (e.g. `appointment.lastReminderSentAt`). Rules register themselves; `modules/automation/index.ts` wires
+  their event handlers to the bus (consumer name `automation:<rule>`).
+- **AutomationJob** (`models/job.model.ts`): one planned send. Unique index **(ruleKey, dedupeKey)** → planning twice
+  or receiving an event twice never creates a second job. Lifecycle:
+  `scheduled → ready → sending → sent | failed`, or `cancelled` (precondition failed, opt-out, rule off, admin) /
+  `superseded` (appointment rescheduled — `supersededBy` links the new job). Deferred jobs go back to `scheduled`
+  with a later time (`deferCount`). Every outcome is in `decisions[]` with a **reason**: `sent`, `optOut`,
+  `quietHours`, `rateLimit`, `budgetExceeded`, `preconditionFailed`, `duplicateSuppressed`, `ruleDisabled`,
+  `superseded`, `manual`, `sendFailed`; every channel try is in `sendAttempts[]`.
+- **Dedupe keys:** `apt:<id>:confirm`, `apt:<id>:T-1d`, `apt:<id>:T-90m`, `apt:<id>:no-show`, `apt:<id>:absence:<from>`,
+  `fup:<visitId>:D-3`, `lab:<id>:ready`, `lab:<id>:sample`, `chat:<id>:<waitStart>:staff|patient`,
+  `chat:<id>:idle:<lastInbound>`, `chat:<id>:emergency:<hour>`, `failures:<hour>`, `digest:<date>`, `bday:<patient>:<year>`.
+- **Scheduler** (`scheduler.ts`, node-cron, started by `server.ts`, never in tests): every minute the dispatcher
+  sends due jobs, then planners whose cadence matches run (1, 15, 60 min). At start-up every planner runs once.
+  **Lease:** a job is claimed with one atomic `findOneAndUpdate` (ready → sending + `{workerId, until}`), so two
+  processes can never send the same job; an expired lease (crashed worker) is recovered; shutdown releases leases.
+  Jobs due right now (a confirmation) are dispatched immediately instead of waiting for the tick.
+- **AutomationRun** (`models/run.model.ts`, kept 30 days): planner / event / dispatch runs with counts and errors.
+
+### 15.2 Rules
+
+| Rule | Trigger | Category | Notes |
+| --- | --- | --- | --- |
+| `appointment_confirmation` | `appointment.booked`, `rescheduled` | reminders | Any source; walk-ins get `walk_in_welcome` (no buttons). Confirm / Reschedule / Cancel |
+| `reminder_day_before` | hourly + reschedule | reminders | Tomorrow's `booked` appointments, at `sendAt` (18:00) the day before. Skips bookings made < 2 h before |
+| `reminder_same_day` | every 15 min | reminders | `minutesBefore` (90) the slot; cancelled on check-in |
+| `no_show_rebook` | `appointment.no_show` + `delayMinutes` (180) | followUps | Dropped if the patient already rebooked. Rebook / Not now / Don't contact me |
+| `follow_up_reminder` | `visit.closed` + hourly safety net | followUps | `daysBefore` (3) the follow-up date at 10:00; dropped if that doctor is booked within ±3 days or the visit was reopened |
+| `lab_report_ready` | `lab.report_ready` + hourly safety net | labReports | Test **names** only, never values. Urgent orders may pass quiet hours |
+| `lab_sample_reminder` | hourly | labReports | Order still `ordered` after `hoursAfter` (24) |
+| `chat_no_reply` | every minute | internal | `needs_human` without staff reply: inbox alert after 20 min, courtesy message to the patient after 45; taken-over chats where the patient wrote again (replaces the Phase 5 timer, uses `assistantTakeoverReminderMinutes`) |
+| `doctor_absence` | `doctor.leave_added` | **essential** | Today/tomorrow (`daysAhead`): flags `appointment.doctorAbsent` for reception, apology + Reschedule / Cancel. Sends even after STOP |
+| `staff_emergency_alert` | `chat.handover_requested` (emergency) | internal | Loud in-app alert to `inbox:manage`; optional `onCallPhones` WhatsApp copy |
+| `staff_failure_alert` | every 15 min | internal | Admins alerted when failed sends in the last hour ≥ `failureAlertThreshold` |
+| `daily_digest` | daily at `sendAt` (21:30) | internal | Plain counts for `report:operations` (AI narrative = Phase 7) |
+| `birthday_greeting` | daily | marketing | **Off by default**; only patients with `preferences.marketing` |
+
+Every rule's config also has `quietHoursOverride`, `dailyLimit`, `channels` (WhatsApp → SMS) and `templateKey`.
+Admin changes are stored in `AutomationRuleSetting` (only values that differ from the code defaults).
+
+### 15.3 Message Outbox (single source of truth)
+
+`OutboxMessage` = every outgoing message: automation (`source: automation`), chatbot replies (`chatbot`), staff
+inbox replies (`staff`), system notices, in-app staff alerts (`channel: inapp`), admin test sends (`test`), and
+verification codes (stored **masked**). Fields: patient, toType/toRef, channel, messageKind (`session` / `template`
+/ `sms` / `inapp`), templateKey + version, variables, **renderedText** (exact text), buttons, status
+(`queued → sending → sent → delivered → read` | `failed` | `cancelled`), providerMessageId, `deliveryUpdates[]`,
+`simulated`, related entity, ruleKey/job, conversation/chatMessage, `replyWindowClosesAt`, `repliedAt`/`replyAction`,
+`cost` (reserved for Phase 7).
+- `outbox/outbox.service.ts` is the only way automation reaches a patient: WhatsApp inside the **24-hour window** →
+  session message with reply buttons (`auto|<action>|<id>`); outside → the approved **template** (name, language,
+  `{{1}}…` parameters, quick-reply payloads); no template or a Meta error → **SMS fallback** (`outbox/sms.ts`:
+  `SmsProvider` interface + stub that only logs; plug a gateway with `setSmsProvider()`).
+- The automated message is also stored in the patient's WhatsApp **conversation** (`sender: automation`), so a reply
+  lands in the same chat the assistant knows.
+- Phase 5 senders were wrapped: the WhatsApp and web adapters, the web chat route, the OTP sender and the admin
+  test message all write Outbox rows (`outbox/record.ts`); WhatsApp delivery webhooks update both `ChatMessage` and
+  `OutboxMessage` (statuses only move forward).
+
+### 15.4 Templates
+
+`MessageTemplate`: key, category, channels, declared **variables** (name, type `string|date|time|number|money|url`,
+required, sample), bodies `{bn, en}`, buttons `{action, label{bn,en}}` (≤ 3, ≤ 20 chars), `whatsappTemplateName`,
+`whatsappLanguages`, `whatsappParams` (variables for `{{1}}, {{2}}…`), `isActive`, `version` + `history` (rollback
+creates a new version). Engine `templates/render.ts`: only `{{name}}`, no code; **validated on save** (unknown
+placeholder, bad syntax, bad WhatsApp mapping, button limits); values are plain text (braces stripped, capped);
+dates/times localised; Bangla digits per `messageNumerals`; a line whose optional values are empty is dropped.
+Defaults for every rule in `templates/defaults.ts` (inserted once at start-up / seed, never overwriting edits).
+Messages carry first names, doctor, date, time, serial, room — **never** results, diagnoses, medicines or anyone
+else's details.
+
+### 15.5 Responsible messaging (checked right before every patient send)
+
+1. Rule enabled, automation not paused. 2. `prepare()` — precondition still true. 3. **Preferences**
+(`Patient.preferences`): category switches `reminders` / `followUps` / `labReports`; `optOutAll` (STOP) silences all
+except **essential** rules; `marketing` is opt-in and never after STOP. 4. **Quiet hours** (`quietHoursStart` /
+`End`, default 21:00–09:00 Dhaka) → deferred to the morning unless the job is urgent AND the rule allows override.
+5. **Limits** → deferred to tomorrow morning, never dropped: per-rule `dailyLimit`, global `automationDailyBudget`,
+per-phone `perPhoneDailyCap` (reminder-style rules). 6. **Duplicate**: identical text to the same phone within
+`dedupeWindowMinutes` (30) → skipped.
+
+### 15.6 Replies (`replies.ts`)
+
+An interaction handler runs before the model. Buttons `auto|confirm|<appointmentId>` etc., or a typed answer
+("Cancel", "বাতিল", "2") to the last automated message within 48 h:
+- **confirm** → `appointment.confirmedByPatient` (ownership checked against the verified phone), thank-you reply;
+- **reschedule** → the same doctor's free times (`get_available_slots` tool) → `reschedule_appointment` tool →
+  summary + Confirm → existing reschedule service;
+- **cancel** → `cancel_appointment` tool → Confirm → existing cancel service → "New time" button;
+- **rebook / book** → free times of the right doctor → normal booking flow; **queue** → `get_queue_status` tool;
+- **stop** / typed **STOP** → `optOutAll` for every patient on that phone (audited) + confirmation with how to opt
+  back in; **START** → back on. Free text continues in the assistant. WhatsApp retries are ignored (message id).
+
+### 15.7 Simulation mode and preview
+
+Hospital settings `simulateWhatsApp` / `simulateSms` (default **on** outside production): messages are created and
+rendered normally, but the dry-run transport never calls Meta or a gateway; delivered/read are faked after 1.5 s /
+5 s. Simulated WhatsApp messages appear in Admin → WhatsApp Simulator (open it with the patient's number and reply
+there). **Real WhatsApp:** set the four `WHATSAPP_*` variables (§14.6), approve templates named like
+`tl_appointment_confirmation` in Meta with the same parameter order, then switch off "Simulate WhatsApp" in
+Automation → Settings. **Preview world** (`POST /automation/preview-world`, admin): replays planners hourly up to a
+time in the next 24 h, plus queued jobs, and shows who would get what and whether it would send, defer or skip —
+nothing stored.
+
+### 15.8 Demo data (`npm run seed`)
+
+`seedAutomationDemo()`: rule rows, templates, demo patient **Rahim Uddin, 01711-000001** with an appointment later
+today (same-day reminder in ~5 min), one tomorrow (confirmation now), a no-show yesterday (rebook offer in 2 min), a
+visit with follow-up in 3 days and a report verified just now; 6 history rows and one **failed** send to practise
+Retry. Runs once (skipped when automation outbox rows exist).
+
+### 15.9 Adding a rule
+
+1. Add a template to `templates/defaults.ts` (bn + en, variables, buttons, WhatsApp mapping).
+2. Create the rule with `registerRule({...})` in `rules/<area>.rules.ts` (import it in `rules/index.ts`): choose a
+   category, a unique dedupe-key pattern, `events` and/or `plan` + `cadenceMinutes`, a `prepare` that re-checks
+   everything and returns only safe variables, optional `postSend`.
+3. Planner + postSend tests in `tests/api/automation-rules.test.ts`. New event? See §11.
+
+`npm test` covers: idempotent planning and the unique index, lease (two workers), precondition at send time,
+supersede on reschedule, 24 h session vs template + parameter mapping, quiet hours + urgent override, per-phone cap
+and global budget deferral, duplicate suppression, opt-out / essential / marketing, SMS fallback, failed → retry,
+delivery statuses, every rule's planner and postSend, replies through the real WhatsApp path, webhook retry,
+admin API permissions, template validation and rollback, CSV masking, preview world, preferences API, demo seed.
+
+---
+
+## 16. Testing
 
 - `npm test` → Jest with `--experimental-vm-modules` (Puppeteer is an ES module). `tests/setup` starts one
   in-memory MongoDB **replica set** (transactions); each file gets its own database and safe env values.
@@ -688,7 +843,7 @@ Jest in CI); `-- --real` evaluates the configured model. Scenarios: `scripts/eva
 
 ---
 
-## 16. Recipes
+## 17. Recipes
 
 **New feature module:** `modules/<area>/<feature>/` with model (+ `basePlugin`), service (rules, `recordAudit`,
 sockets, `publish` after commit), route (`authenticate()` + `requirePermission()` + `validateRequest()`), mount in
@@ -713,7 +868,7 @@ through a pending action + Confirm; add scenarios to `scripts/eval/scenarios.ts`
 
 ---
 
-## 17. Phase log
+## 18. Phase log
 
 ### Phase 1 — Foundation (done)
 Kept the existing TS backend and Next.js frontend; added Zod env, MongoDB module, pino, security middleware,
@@ -763,13 +918,31 @@ over WhatsApp when configured — a WhatsApp OTP to a number outside the 24 h wi
 template, Phase 6); Atlas vector index needs an Atlas cluster (text search otherwise); the evaluation's mock model
 checks the plumbing and safety, not language quality (use `--real`); the running summary uses the same AI provider.
 
-### Next: Phase 6 — Automation engine
-Expected: consume the domain events (reminders, follow-ups from `visit.closed.followUpDate`, no-show, report-ready),
-an outbox with retries, WhatsApp template messages outside the 24 h window, automation settings for admins.
+### Phase 6 — Automation engine (done)
+Owner decisions: the Phase 5 inbox timer (`remindIdleTakeovers` in server.ts) became part of rule
+`chat_no_reply`; management got a new read-only `automation:read` (`automation:manage` stays super admin). Docs in
+the two READMEs (the prompt's docs/ paths).
+Built: rule registry + 13 rules, AutomationJob with unique dedupe keys and lease-locked dispatcher, node-cron
+scheduler with start-up catch-up, Message Outbox wrapping every sender (automation, assistant, staff, OTP, tests),
+template system with save-time validation, versions and bn/en preview, 24 h session vs approved template, SMS
+fallback hook, quiet hours / limits / duplicate / preference guards with reasons, reply handling through the
+assistant's own tools, patient preferences + STOP/START, simulation mode with fake delivery, preview world, admin
+API + UI, patient Messages tab, demo seed, 54 new tests.
+Decisions and why: jobs are PLANNED, not sent, so the queue is visible and preconditions are re-checked at send
+time; the dedupe index (not code) guarantees idempotency; deferral instead of dropping keeps limits safe; the
+message text is rendered at send time from fresh data; replies reuse the Confirm step, so no new booking logic
+exists; essential = only messages about the hospital changing the patient's own booking.
+Known limitations: the SMS provider is a stub (logs only); WhatsApp templates must be approved in Meta with the same
+names/parameter order before switching simulation off; per-phone cap counts by phone (families share it); the
+digest is plain numbers (AI narrative in Phase 7); a single scheduler process is assumed for cron cadence (several
+are safe — leases — but each runs the planners).
+
+### Next: Phase 7 — Business & launch
+Billing and payments, analytics, AI daily report (on top of the digest), security review, deployment.
 
 ---
 
-## 18. Troubleshooting
+## 19. Troubleshooting
 
 | Problem | Fix |
 | --- | --- |
@@ -786,5 +959,9 @@ an outbox with retries, WhatsApp template messages outside the 24 h window, auto
 | Web chat never receives the code | SMS is not built: in development open Admin → Channels → development codes |
 | WhatsApp webhook "verification failed" in Meta | `WHATSAPP_VERIFY_TOKEN` differs, or not all four WhatsApp variables are set (channel off answers 403/404) |
 | WhatsApp webhook calls get 401 | Wrong `WHATSAPP_APP_SECRET` (the signature is checked over the raw body) |
+| No automated messages at all | Automation → Settings: "Pause" off? Scheduler card "Running"? (it runs only in `npm run dev`/`start`, not in tests). Rule enabled? |
+| Messages "deferred" | Quiet hours, daily budget or per-phone cap — the job's reason says which; they go out later automatically |
+| Real WhatsApp: "Outside the 24-hour window and no approved template" | Approve the template in Meta with the name in Automation → Templates, or rely on the SMS fallback |
+| Patient got nothing after STOP | Correct: only essential messages; reception can switch them back on in the patient's Messages tab (or the patient replies START) |
 | Staff reply to WhatsApp refused | Patient's last message is older than 24 hours (templates come in Phase 6) |
 | Knowledge answers look unrelated | Admin → Knowledge Base → Test the assistant; check the passage scores; on Atlas wait for the vector index or press Re-index |
