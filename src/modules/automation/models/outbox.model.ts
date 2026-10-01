@@ -49,6 +49,8 @@ export interface IOutboxMessage {
   replyWindowClosesAt?: Date | null; // WhatsApp 24 h customer-service window at send time
   payload?: unknown; // what was handed to the provider (debugging + simulator)
   retryOf?: Types.ObjectId | null;
+  repliedAt?: Date | null; // the patient answered this message (button or typed)
+  replyAction?: string | null; // confirm / reschedule / cancel / rebook / book / stop …
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -96,6 +98,8 @@ const OutboxSchema = new Schema<IOutboxMessage>(
     replyWindowClosesAt: { type: Date, default: null },
     payload: { type: Schema.Types.Mixed, default: null },
     retryOf: { type: Schema.Types.ObjectId, ref: "OutboxMessage", default: null },
+    repliedAt: { type: Date, default: null },
+    replyAction: { type: String, default: null },
   },
   { timestamps: true },
 );

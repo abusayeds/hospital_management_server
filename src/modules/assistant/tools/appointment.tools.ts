@@ -483,6 +483,8 @@ const execute = async (conv: ConversationDocument, pending: PendingAction): Prom
         kind: "cancel_success",
         title: "অ্যাপয়েন্টমেন্ট বাতিল হয়েছে · Cancelled",
         fields: [{ label: "তারিখ · Date", value: `${dateLabel(appt.date)} ${time12(appt.slotTime)}` }],
+        // Offer the next free times with the same doctor right away (handled by automation replies)
+        actions: [{ id: `auto|rebook|${appt._id}`, label: "নতুন সময় নিন · New time" }],
       },
     ];
   }
