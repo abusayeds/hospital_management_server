@@ -58,14 +58,17 @@ app.use(
   }),
 );
 
-// 4. Only our frontend may call the API from a browser, with cookies. Other origins (including
-//    their preflight requests) get a 403 instead of a silent response without CORS headers.
+// 4. Only our frontend may call the API from a browser, with cookies. A preflight from another
+//    origin gets a 403; its simple requests get no CORS headers and meet the CSRF check (step 7).
+app.use((req, _res, next) => {
+  const origin = req.get("origin");
+  if (req.method === "OPTIONS" && origin && !env.CLIENT_URL.includes(origin))
+    return next(new AppError(403, "This origin is not allowed to call the API.", "FORBIDDEN"));
+  next();
+});
 app.use(
   cors({
-    origin: (origin, callback) =>
-      !origin || env.CLIENT_URL.includes(origin)
-        ? callback(null, true)
-        : callback(new AppError(403, "This origin is not allowed to call the API.", "FORBIDDEN")),
+    origin: env.CLIENT_URL,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "X-Requested-With"],
