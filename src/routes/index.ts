@@ -23,6 +23,7 @@ import { LabRoutes } from "../modules/clinical/lab/lab.route";
 import { AiSummaryRoutes } from "../modules/clinical/ai-summary/aiSummary.route";
 import { VerifyRoutes } from "../documents/verify.route";
 import { HealthRoutes } from "./health.route";
+import { AutomationRoutes } from "../modules/automation/automation.route";
 import "../modules/automation"; // registers automation rules on the event bus
 
 // Mounted at /api/v1 in app.ts. A future /api/v2 can live beside it.
@@ -57,6 +58,7 @@ const moduleRoutes: { path: string; route: express.Router }[] = [
   { path: "/queue", route: QueueRoutes },
   { path: "/display", route: DisplayRoutes },
   { path: "/dashboard", route: DashboardRoutes },
+  { path: "/automation", route: AutomationRoutes },
   { path: "/assistant/web", route: WebChatRoutes },
   { path: "/knowledge", route: KnowledgeRoutes },
   { path: "/assistant/admin", route: AssistantAdminRoutes },
