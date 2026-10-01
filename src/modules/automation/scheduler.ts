@@ -44,6 +44,10 @@ export const startScheduler = () => {
   });
   schedulerStatus.running = true;
   schedulerStatus.startedAt = new Date();
+  // Catch up once at start: every planner runs now instead of waiting for its next cadence slot
+  void (async () => {
+    for (const rule of allRules()) if (rule.plan) await runPlanner(rule).catch(() => undefined);
+  })();
   logger.info({ workerId: WORKER_ID }, "Automation scheduler started");
 };
 

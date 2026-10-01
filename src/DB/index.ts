@@ -6,6 +6,7 @@ import { seedClinicalHistory } from "./seed-data/clinicalHistory";
 import { seedDemoActivity } from "./seed-data/demoActivity";
 import { seedKnowledge } from "./seed-data/knowledge";
 import { seedAssistantDemo } from "./seed-data/assistantDemo";
+import { seedAutomationDemo } from "./seed-data/automationDemo";
 
 // Runs on every server start: reference data the app needs (idempotent).
 export const seedReferenceData = async () => {
@@ -33,6 +34,8 @@ const seedDatabase = async () => {
     await seedKnowledge();
     // Staff inbox demo: a few assistant conversations (one emergency, one waiting for staff)
     await seedAssistantDemo();
+    // Automation demo (simulated): a demo patient with reminders due within minutes, outbox history
+    await seedAutomationDemo();
   }
 };
 
