@@ -22,7 +22,7 @@ router.get(
   validateRequest(
     z.object({
       query: z.object({
-        filter: z.enum(inbox.INBOX_FILTERS).default("needs_human"),
+        filter: z.enum(inbox.INBOX_FILTERS).default("open"),
         channel: z.enum(["web", "whatsapp"]).optional(),
         q: z.string().trim().max(100).optional(),
         page: z.coerce.number().int().min(1).default(1),

@@ -21,7 +21,16 @@ import { notifyInbox } from "./handover";
  * replies, hand-back and resolve are audited.
  */
 
-export const INBOX_FILTERS = ["needs_human", "emergency", "human_active", "bot_active", "resolved", "all"] as const;
+// "open" = still with staff: waiting for someone (needs_human) or being handled (human_active)
+export const INBOX_FILTERS = [
+  "open",
+  "needs_human",
+  "emergency",
+  "human_active",
+  "bot_active",
+  "resolved",
+  "all",
+] as const;
 
 export const CANNED_REPLIES = [
   {
@@ -73,6 +82,7 @@ export const listConversations = async (f: {
 }) => {
   const query: Record<string, unknown> = {};
   if (f.filter === "emergency") query.emergency = true;
+  else if (f.filter === "open") query.status = { $in: ["needs_human", "human_active"] };
   else if (f.filter !== "all") query.status = f.filter;
   if (f.channel) query.channel = f.channel;
   if (f.q) {
