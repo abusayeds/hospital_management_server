@@ -17,6 +17,7 @@ import { DisplayRoutes, QueueRoutes } from "../modules/hospital/queue/queue.rout
 import { PatientRoutes } from "../modules/patients/patient.route";
 import { UserRoutes } from "../modules/users/user.route";
 import { AnalyticsRoutes } from "../modules/analytics/analytics.route";
+import { DailyReportRoutes } from "../modules/reports/report.route";
 import { EventRoutes } from "../events/events.route";
 import { VitalsRoutes } from "../modules/clinical/vitals/vitals.route";
 import { VisitRoutes } from "../modules/clinical/visits/visit.route";
@@ -62,6 +63,7 @@ const moduleRoutes: { path: string; route: express.Router }[] = [
   { path: "/dashboard", route: DashboardRoutes },
   { path: "/invoices", route: InvoiceRoutes },
   { path: "/reports", route: FinanceReportRoutes },
+  { path: "/reports", route: DailyReportRoutes },
   { path: "/analytics", route: AnalyticsRoutes },
   { path: "/automation", route: AutomationRoutes },
   { path: "/assistant/web", route: WebChatRoutes },

@@ -3,3 +3,4 @@ import "./appointment.rules";
 import "./clinical.rules";
 import "./chat.rules";
 import "./staff.rules";
+import "./report.rules";

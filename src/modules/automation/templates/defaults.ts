@@ -280,6 +280,24 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
     isActive: true,
   },
   {
+    key: "daily_ai_report",
+    description: "Internal: end-of-day report for management (AI narrative or bullet summary)",
+    category: "alert",
+    channels: ["inapp", "whatsapp"],
+    variables: [
+      v("date", "2026-10-01", "date"),
+      v("source", "AI"),
+      v("headline", "আজ মোট ৮৪টি অ্যাপয়েন্টমেন্ট ছিল, যা গত সপ্তাহের একই দিনের চেয়ে বেশি।"),
+    ],
+    bodies: {
+      bn: "📊 দৈনিক রিপোর্ট {{date}} ({{source}}): {{headline}} — পুরো রিপোর্ট: Management → Reports",
+      en: "📊 Daily report {{date}} ({{source}}): {{headline}} — full report in Management → Reports",
+    },
+    buttons: [],
+    ...wa("tl_daily_report", ["date", "source", "headline"]),
+    isActive: true,
+  },
+  {
     key: "birthday_greeting",
     description: "Marketing: birthday wishes (opt-in only)",
     category: "promotion",
