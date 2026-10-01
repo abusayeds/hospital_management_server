@@ -63,7 +63,8 @@ export const labTestCatalog = makeCatalog({
     isActive: z.boolean().optional(),
   }),
   extraListQuery: { category: z.string().trim().max(60).optional() },
-  readPermissions: ["lab_order:read", "lab_order:create"],
+  // bill:collect: the cash counter adds tests to a counter bill (prices from the catalogue)
+  readPermissions: ["lab_order:read", "lab_order:create", "bill:collect"],
   managePermission: "master_data:manage",
 });
 
