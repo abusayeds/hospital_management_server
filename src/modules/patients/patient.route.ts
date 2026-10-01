@@ -128,5 +128,32 @@ router.post("/", requirePermission("patient:create"), validateRequest(createSche
 router.get("/:id", requirePermission("patient:read_basic"), validateRequest(idSchema), get);
 router.get("/:id/appointments", requirePermission("appointment:read"), validateRequest(historySchema), appointments);
 router.patch("/:id", requirePermission("patient:update"), validateRequest(updateSchema), update);
+router.patch(
+  "/:id/preferences",
+  requirePermission("patient:update"),
+  validateRequest(
+    idSchema.extend({
+      body: z
+        .object({
+          reminders: z.boolean(),
+          followUps: z.boolean(),
+          labReports: z.boolean(),
+          marketing: z.boolean(),
+          language: z.enum(["bn", "en"]),
+          optOutAll: z.boolean(),
+        })
+        .partial()
+        .strict(),
+    }),
+  ),
+  catchAsync(async (req: Request, res: Response) => {
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Message preferences saved",
+      data: await patientService.updatePreferences(req, req.params.id, req.body),
+    });
+  }),
+);
 
 export const PatientRoutes = router;

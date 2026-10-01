@@ -10,7 +10,7 @@ import { ageOn, todayInDhaka } from "../../utils/date";
 import { escapeRegex } from "../../utils/escapeRegex";
 import { normalizeBdPhone, phoneSearchPrefix } from "../../utils/phone";
 import { recordAudit } from "../audit/audit.service";
-import { IPatient, PatientDocument, PatientModel } from "./patient.model";
+import { IPatient, PatientDocument, PatientModel, PatientPreferences } from "./patient.model";
 
 // ------------------------------------------------------------------ names & duplicates
 
@@ -76,6 +76,17 @@ export const toPatientBasic = (p: any) => ({
   nidMasked: p.nidLast4 ? maskTail(`0000000000${p.nidLast4}`, 4) : null,
   registrationSource: p.registrationSource,
   lastVisitDate: p.lastVisitDate,
+  // Message preferences (Phase 6): reception changes them on request; STOP / START replies change them too
+  preferences: {
+    reminders: p.preferences?.reminders ?? true,
+    followUps: p.preferences?.followUps ?? true,
+    labReports: p.preferences?.labReports ?? true,
+    marketing: p.preferences?.marketing ?? false,
+    language: p.preferences?.language ?? "bn",
+    optOutAll: p.preferences?.optOutAll ?? false,
+    optOutAt: p.preferences?.optOutAt ?? null,
+    optOutReason: p.preferences?.optOutReason ?? null,
+  },
   createdAt: p.createdAt,
 });
 
@@ -286,7 +297,38 @@ export const updatePatient = async (req: Request, id: string, input: Partial<Pat
   return serializePatient(doc, viewFor(req.user!.role));
 };
 
+export type PreferencesInput = Partial<
+  Pick<PatientPreferences, "reminders" | "followUps" | "labReports" | "marketing" | "language" | "optOutAll">
+>;
+
+/** Change what automated messages the patient gets (staff acting on the patient's request) */
+export const updatePreferences = async (req: Request, id: string, input: PreferencesInput) => {
+  const doc = await findPatientOrThrow(id);
+  const before = { ...(doc.toObject().preferences ?? {}) };
+  for (const [k, v] of Object.entries(input)) doc.set(`preferences.${k}`, v);
+  if (input.optOutAll === true && !before.optOutAll) {
+    doc.set("preferences.optOutAt", new Date());
+    doc.set("preferences.optOutReason", `Set by ${req.user!.name}`);
+  }
+  if (input.optOutAll === false) {
+    doc.set("preferences.optOutAt", null);
+    doc.set("preferences.optOutReason", null);
+  }
+  doc.set("updatedBy", req.user!.id);
+  await doc.save();
+  await recordAudit({
+    req,
+    action: "UPDATE",
+    entityType: "Patient",
+    entityId: doc._id,
+    before: { preferences: before },
+    after: { preferences: doc.toObject().preferences },
+  });
+  return serializePatient(doc, viewFor(req.user!.role)).preferences;
+};
+
 export const patientService = {
+  updatePreferences,
   searchPatients,
   createPatient,
   findPatientOrThrow,
