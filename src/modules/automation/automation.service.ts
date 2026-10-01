@@ -192,7 +192,6 @@ export const outboxView = (o: any) => ({
   language: o.language,
   text: o.renderedText,
   buttons: (o.interactive?.buttons ?? []).map((b: any) => b.label),
-  simulated: o.simulated,
   error: o.error,
   providerMessageId: o.providerMessageId,
   deliveryUpdates: o.deliveryUpdates ?? [],
@@ -276,7 +275,6 @@ export const exportOutboxCsv = async (f: Omit<OutboxFilters, "page" | "limit">) 
     "to",
     "patientCode",
     "language",
-    "simulated",
     "error",
     "text",
   ];
@@ -291,7 +289,6 @@ export const exportOutboxCsv = async (f: Omit<OutboxFilters, "page" | "limit">) 
       maskPhone(o.toRef),
       o.patient?.patientCode ?? "",
       o.language,
-      o.simulated ? "yes" : "no",
       o.error ?? "",
       o.renderedText,
     ]
@@ -513,7 +510,6 @@ export const health = async () => {
   return {
     scheduler: schedulerStatus,
     paused: settings.automationPaused,
-    simulation: { whatsapp: settings.simulateWhatsApp, sms: settings.simulateSms },
     whatsappConfigured: isWhatsAppConfigured(),
     sms: { ...smsInfo(), fallbackEnabled: settings.smsFallbackEnabled },
     failedLastHour,
@@ -539,9 +535,6 @@ export const AUTOMATION_SETTING_KEYS = [
   "automationDailyBudget",
   "perPhoneDailyCap",
   "dedupeWindowMinutes",
-  "simulateWhatsApp",
-  "simulateSms",
-  "whatsappLiveRecipients",
   "smsFallbackEnabled",
   "failureAlertThreshold",
 ] as const;

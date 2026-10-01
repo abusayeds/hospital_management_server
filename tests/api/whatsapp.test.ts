@@ -6,7 +6,7 @@ import { renderForWhatsApp } from "../../src/modules/assistant/channels/whatsapp
 import { ChatMessageModel } from "../../src/modules/assistant/chatMessage.model";
 import { ConversationModel } from "../../src/modules/assistant/conversation.model";
 import { scriptedProvider } from "../assistant-fakes";
-import { app, createUser, request, signIn, useTestDatabase } from "../helpers";
+import { app, request, useTestDatabase } from "../helpers";
 
 const SECRET = "test-app-secret";
 const FROM = "8801711223344";
@@ -156,19 +156,6 @@ describe("WhatsApp channel", () => {
     await whatsappAdapter.deliver(conv, [{ doc, message: { type: "text", text: "late" } }]);
     expect(sent.length).toBe(before);
     expect((await ChatMessageModel.findById(doc._id))?.deliveryError).toContain("24-hour");
-  });
-
-  it("the simulator runs the same adapter path and never calls Meta", async () => {
-    setAiProvider(scriptedProvider([() => ({ text: "Hello from the simulator" })]).provider);
-    await createUser({ role: "super_admin", email: "admin@test.local" });
-    const admin = await signIn("admin@test.local");
-    const res = await admin
-      .post("/api/v1/assistant/admin/simulator/whatsapp")
-      .send({ from: "01811000000", text: "hi" });
-    expect(res.status).toBe(200);
-    const out = res.body.data.messages.find((m: { direction: string }) => m.direction === "outbound");
-    expect(out.payloads[0]).toMatchObject({ to: "8801811000000", type: "text" });
-    expect(sent).toHaveLength(0);
   });
 });
 

@@ -332,9 +332,6 @@ router.patch(
           automationDailyBudget: z.number().int().min(0).max(100_000),
           perPhoneDailyCap: z.number().int().min(1).max(20),
           dedupeWindowMinutes: z.number().int().min(0).max(1440),
-          simulateWhatsApp: z.boolean(),
-          simulateSms: z.boolean(),
-          whatsappLiveRecipients: z.array(z.string().regex(/^\+8801[3-9]\d{8}$/, "Use +8801XXXXXXXXX")).max(20),
           smsFallbackEnabled: z.boolean(),
           failureAlertThreshold: z.number().int().min(1).max(1000),
         })

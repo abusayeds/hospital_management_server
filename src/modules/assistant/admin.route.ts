@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { randomBytes } from "crypto";
 import express, { Request, Response } from "express";
 import { z } from "zod";
 import { env } from "../../config/env";
@@ -11,10 +10,9 @@ import catchAsync from "../../utils/catchAsync";
 import sendResponse from "../../utils/sendResponse";
 import { toE164Bd } from "../../utils/phone";
 import { recordAudit } from "../audit/audit.service";
-import { drainWhatsApp, processWebhook, whatsappInfo } from "./channels/whatsapp/adapter";
+import { whatsappInfo } from "./channels/whatsapp/adapter";
 import { isWhatsAppConfigured } from "./channels/whatsapp/client";
 import { sendRawWhatsApp } from "../automation/outbox/outbox.service";
-import { ChatMessageModel } from "./chatMessage.model";
 import { ConversationModel } from "./conversation.model";
 import { maskPhone } from "./otp.service";
 import { VerificationModel } from "./verification.model";
@@ -32,10 +30,7 @@ router.get(
   catchAsync(async (req: Request, res: Response) => {
     const [web, wa] = await Promise.all(
       (["web", "whatsapp"] as const).map((channel) =>
-        ConversationModel.findOne({ channel, simulated: { $ne: true } })
-          .sort({ lastInboundAt: -1 })
-          .select("lastInboundAt")
-          .lean<any>(),
+        ConversationModel.findOne({ channel }).sort({ lastInboundAt: -1 }).select("lastInboundAt").lean<any>(),
       ),
     );
     const base = `${req.protocol}://${req.get("host")}`;
@@ -91,130 +86,6 @@ router.get(
       "Development codes",
       rows.map((r) => ({ phone: maskPhone(r.phone), code: r.devCode, expiresAt: r.expiresAt, attempts: r.attempts })),
     );
-  }),
-);
-
-// ------------------------------------------------------------------ WhatsApp simulator (admin)
-
-const simBody = z.object({
-  body: z
-    .object({
-      from: z.string().trim().min(8).max(20),
-      name: z.string().trim().max(60).optional(),
-      text: z.string().trim().max(1000).optional(),
-      replyId: z.string().trim().max(200).optional(),
-      title: z.string().trim().max(100).optional(),
-      kind: z.enum(["text", "button", "list", "image"]).default("text"),
-    })
-    .strict(),
-});
-
-/** The same JSON Meta would POST to our webhook */
-const buildWebhook = (b: z.infer<typeof simBody>["body"], waId: string) => {
-  const id = `wamid.SIM.${randomBytes(8).toString("hex")}`;
-  const message: Record<string, unknown> = { from: waId, id, timestamp: String(Math.floor(Date.now() / 1000)) };
-  if (b.kind === "image")
-    Object.assign(message, { type: "image", image: { id: "sim-media", mime_type: "image/jpeg" } });
-  else if (b.replyId)
-    Object.assign(message, {
-      type: "interactive",
-      interactive:
-        b.kind === "list"
-          ? { type: "list_reply", list_reply: { id: b.replyId, title: b.title ?? "" } }
-          : { type: "button_reply", button_reply: { id: b.replyId, title: b.title ?? "" } },
-    });
-  else Object.assign(message, { type: "text", text: { body: b.text ?? "" } });
-  return {
-    object: "whatsapp_business_account",
-    entry: [
-      {
-        id: "SIMULATOR",
-        changes: [
-          {
-            field: "messages",
-            value: {
-              messaging_product: "whatsapp",
-              metadata: { phone_number_id: "SIMULATOR" },
-              contacts: [{ wa_id: waId, profile: { name: b.name ?? "Simulator" } }],
-              messages: [message],
-            },
-          },
-        ],
-      },
-    ],
-  };
-};
-
-const simulatorView = async (waId: string) => {
-  const conv = await ConversationModel.findOne({
-    channel: "whatsapp",
-    channelUserId: waId,
-    simulated: true,
-  }).lean<any>();
-  if (!conv) return { conversation: null, messages: [] };
-  const messages = await ChatMessageModel.find({ conversation: conv._id })
-    .sort({ createdAt: 1 })
-    .limit(200)
-    .lean<any[]>();
-  return {
-    conversation: { id: String(conv._id), status: conv.status, verified: Boolean(conv.verifiedPhone) },
-    messages: messages.map((m) => ({
-      id: String(m._id),
-      direction: m.direction,
-      sender: m.sender,
-      text: m.text,
-      replyId: m.replyId,
-      payloads: m.channelPayload ?? [],
-      deliveryStatus: m.deliveryStatus,
-      deliveryError: m.deliveryError,
-      createdAt: m.createdAt,
-    })),
-  };
-};
-
-const waIdOf = (phone: string) => {
-  const e164 = toE164Bd(phone);
-  if (!e164) throw new AppError(400, "Use a Bangladeshi number, e.g. 01711223344.", "VALIDATION_ERROR");
-  return e164.replace("+", "");
-};
-
-router.post(
-  "/simulator/whatsapp",
-  requirePermission("settings:manage"),
-  validateRequest(simBody),
-  catchAsync(async (req: Request, res: Response) => {
-    const waId = waIdOf(req.body.from);
-    // Same path as a real webhook, minus the HTTP signature: adapter → engine → adapter (simulator transport)
-    await processWebhook(buildWebhook(req.body, waId) as never, { simulated: true });
-    await drainWhatsApp();
-    ok(res, "Simulated", await simulatorView(waId));
-  }),
-);
-
-router.get(
-  "/simulator/whatsapp",
-  requirePermission("settings:manage"),
-  validateRequest(z.object({ query: z.object({ from: z.string().trim().min(8).max(20) }) })),
-  catchAsync(async (req: Request, res: Response) =>
-    ok(res, "Simulator", await simulatorView(waIdOf(String(req.query.from)))),
-  ),
-);
-
-router.delete(
-  "/simulator/whatsapp",
-  requirePermission("settings:manage"),
-  validateRequest(z.object({ query: z.object({ from: z.string().trim().min(8).max(20) }) })),
-  catchAsync(async (req: Request, res: Response) => {
-    const conv = await ConversationModel.findOne({
-      channel: "whatsapp",
-      channelUserId: waIdOf(String(req.query.from)),
-      simulated: true,
-    });
-    if (conv) {
-      await ChatMessageModel.deleteMany({ conversation: conv._id });
-      await ConversationModel.deleteOne({ _id: conv._id });
-    }
-    ok(res, "Simulator conversation cleared", null);
   }),
 );
 

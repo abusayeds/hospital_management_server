@@ -16,12 +16,13 @@ import { ensureDefaultTemplates } from "../../src/modules/automation/templates/t
 import { addDays, todayInDhaka } from "../../src/utils/date";
 import { scriptedProvider } from "../assistant-fakes";
 import { createAppointment, createClinic, createPatients } from "../fixtures";
+import { useFakeWhatsApp } from "../fake-whatsapp";
 import { useTestDatabase } from "../helpers";
 
 let n = 0;
 let WA = "";
 
-/** One inbound WhatsApp message (simulator path = the real adapter + engine); returns the replies */
+/** One inbound WhatsApp message through the real adapter + engine; returns the replies */
 const inbound = async (m: { text?: string; replyId?: string; title?: string; id?: string }) => {
   const started = new Date(Date.now() - 1);
   const id = m.id ?? `wamid.IN.${++n}`;
@@ -33,10 +34,7 @@ const inbound = async (m: { text?: string; replyId?: string; title?: string; id?
         interactive: { type: "button_reply", button_reply: { id: m.replyId, title: m.title ?? "" } },
       }
     : { from: WA, id, type: "text", text: { body: m.text } };
-  await processWebhook(
-    { entry: [{ changes: [{ value: { contacts: [{ wa_id: WA }], messages: [message] } }] }] },
-    { simulated: true },
-  );
+  await processWebhook({ entry: [{ changes: [{ value: { contacts: [{ wa_id: WA }], messages: [message] } }] }] });
   return ChatMessageModel.find({ direction: "outbound", sender: { $ne: "automation" }, createdAt: { $gte: started } })
     .sort({ createdAt: 1 })
     .lean<any[]>();
@@ -49,6 +47,7 @@ const optionIds = (msgs: any[]) =>
 
 describe("replies to automated messages", () => {
   useTestDatabase();
+  useFakeWhatsApp();
   let clinic: Awaited<ReturnType<typeof createClinic>>;
   let patient: any;
   let appt: any;
@@ -60,7 +59,7 @@ describe("replies to automated messages", () => {
     await ensureDefaultTemplates();
     await HospitalSettingsModel.updateOne(
       { key: "default" },
-      { $set: { quietHoursStart: "00:00", quietHoursEnd: "00:00", simulateWhatsApp: true, dedupeWindowMinutes: 0 } },
+      { $set: { quietHoursStart: "00:00", quietHoursEnd: "00:00", dedupeWindowMinutes: 0 } },
     );
     clearSettingsCache();
     appt = await createAppointment({

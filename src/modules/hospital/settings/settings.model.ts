@@ -33,11 +33,6 @@ export interface IHospitalSettings extends IBaseFields {
   automationDailyBudget: number; // max automated patient messages per day, all rules together
   perPhoneDailyCap: number; // max non-essential automated messages per phone per day
   dedupeWindowMinutes: number; // identical text to the same phone inside this window is suppressed
-  simulateWhatsApp: boolean; // dry-run: messages go to the simulator, never to Meta
-  // Safety while testing with real WhatsApp: when not empty, ONLY these numbers get real messages
-  // (everyone else — e.g. fictional demo patients — stays in the simulator)
-  whatsappLiveRecipients: string[];
-  simulateSms: boolean; // dry-run for the SMS fallback
   smsFallbackEnabled: boolean; // try SMS when WhatsApp cannot deliver
   failureAlertThreshold: number; // alert admins when this many sends fail within an hour
 }
@@ -69,9 +64,6 @@ const HospitalSettingsSchema = new Schema<IHospitalSettings>({
   automationDailyBudget: { type: Number, default: 500, min: 0, max: 100_000 },
   perPhoneDailyCap: { type: Number, default: 3, min: 1, max: 20 },
   dedupeWindowMinutes: { type: Number, default: 30, min: 0, max: 24 * 60 },
-  simulateWhatsApp: { type: Boolean, default: true },
-  whatsappLiveRecipients: { type: [String], default: [] },
-  simulateSms: { type: Boolean, default: true },
   smsFallbackEnabled: { type: Boolean, default: true },
   failureAlertThreshold: { type: Number, default: 5, min: 1, max: 1000 },
 });

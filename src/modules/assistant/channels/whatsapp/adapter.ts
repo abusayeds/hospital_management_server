@@ -47,13 +47,12 @@ export const whatsappAdapter: ChannelAdapter = {
   channel: "whatsapp",
   async deliver(conv: ConversationDocument, items: Delivery[]) {
     if (!items.length) return;
-    if (!conv.simulated && !isWhatsAppConfigured())
-      return void (await markFailed(conv, items, "WhatsApp is not configured"));
+    if (!isWhatsAppConfigured()) return void (await markFailed(conv, items, "WhatsApp is not configured"));
     // Free-form replies need the 24-hour window; proactive messages use approved templates (automation outbox)
     if (!withinServiceWindow(conv))
       return void (await markFailed(conv, items, "Outside WhatsApp's 24-hour window — only template messages allowed"));
 
-    const transport = transportFor(conv.simulated);
+    const transport = transportFor();
     let numbered: { n: number; id: string; label: string }[] | null = null;
     for (const { doc, message } of items) {
       const rendered = renderForWhatsApp(message);
@@ -141,7 +140,7 @@ export type WebhookPayload = { object?: string; entry?: { changes?: { value?: an
  * Process one webhook call (already signature-checked). Messages are handled one by one, in order.
  * Idempotent: a message id that was processed before (Meta retries) is ignored by the engine.
  */
-export const processWebhook = async (payload: WebhookPayload, opts: { simulated?: boolean } = {}) => {
+export const processWebhook = async (payload: WebhookPayload) => {
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
       const value = change.value ?? {};
@@ -160,14 +159,8 @@ export const processWebhook = async (payload: WebhookPayload, opts: { simulated?
       const names = new Map<string, string>((value.contacts ?? []).map((c: any) => [c.wa_id, c.profile?.name]));
       for (const m of (value.messages ?? []) as WaMessage[]) {
         try {
-          if (opts.simulated)
-            await ConversationModel.updateOne(
-              { channel: "whatsapp", channelUserId: m.from },
-              { $set: { simulated: true }, $setOnInsert: { status: "bot_active" } },
-              { upsert: true },
-            );
           const inbound = await mapNumberedReply(toInbound(m, names.get(m.from)));
-          if (!opts.simulated) void markAsRead(m.id);
+          void markAsRead(m.id);
           const result = await handleInbound(inbound);
           if (result.duplicate) continue;
           await whatsappAdapter.deliver(

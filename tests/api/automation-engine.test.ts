@@ -6,6 +6,7 @@ import { HospitalSettingsModel } from "../../src/modules/hospital/settings/setti
 import { clearSettingsCache } from "../../src/modules/hospital/settings/settings.service";
 import { PatientModel } from "../../src/modules/patients/patient.model";
 import { claimJob, dispatchDue, processJob, retryJob } from "../../src/modules/automation/dispatcher";
+import { setSmsProvider } from "../../src/modules/automation/outbox/sms";
 import { planJobs } from "../../src/modules/automation/jobs";
 import { AutomationJobModel } from "../../src/modules/automation/models/job.model";
 import { OutboxMessageModel } from "../../src/modules/automation/models/outbox.model";
@@ -98,11 +99,11 @@ describe("automation engine", () => {
     await AutomationJobModel.init();
     await ensureDefaultTemplates();
     [patient] = await createPatients(1);
-    // No quiet hours unless a test turns them on; simulation off unless a test turns it on
+    // No quiet hours unless a test turns them on
     await HospitalSettingsModel.updateOne(
       { key: "default" },
       {
-        $set: { quietHoursStart: "00:00", quietHoursEnd: "00:00", simulateWhatsApp: false, simulateSms: true },
+        $set: { quietHoursStart: "00:00", quietHoursEnd: "00:00" },
         $setOnInsert: {
           name: "Testolife",
           nameBn: "টেস্টোলাইফ",
@@ -115,7 +116,10 @@ describe("automation engine", () => {
     );
     clearSettingsCache();
   });
-  afterEach(() => setWhatsAppTransport(null));
+  afterEach(() => {
+    setWhatsAppTransport(null);
+    setSmsProvider(null);
+  });
 
   it("planning is idempotent: the same dedupe key never creates a second job", async () => {
     expect(await plan("a1")).toEqual({ created: 1, updated: 0 });
@@ -244,41 +248,9 @@ describe("automation engine", () => {
     expect(sends).toHaveLength(0);
   });
 
-  it("simulation mode never calls the real sender", async () => {
-    await settings({ simulateWhatsApp: true });
-    world.set("a1", { valid: true });
-    await plan("a1");
-    expect(await dispatchDue(NOW())).toMatchObject({ sent: 1 });
-    expect(sends).toHaveLength(0);
-    const row = await OutboxMessageModel.findOne({ ruleKey: testRule.key });
-    expect(row).toMatchObject({ status: "sent", simulated: true });
-    expect(row!.providerMessageId).toMatch(/^wamid\.SIM\./);
-  });
-
-  it("with a live-recipient list, only listed numbers get real WhatsApp; others stay in the simulator", async () => {
-    const [other] = await createPatients(1);
-    await settings({ simulateWhatsApp: false, whatsappLiveRecipients: [patient.phone], dedupeWindowMinutes: 0 });
-    world.set("a1", { valid: true });
-    world.set("a2", { valid: true });
-    await plan("a1");
-    await planJobs(testRule.key, [
-      {
-        dedupeKey: "apt:a2:T-24h",
-        scopeType: "appointment",
-        scopeId: "a2",
-        scheduledFor: DUE,
-        patientId: String(other._id),
-        data: { patientId: String(other._id), phone: other.phone, serial: 2 },
-      },
-    ]);
-    expect(await dispatchDue(NOW())).toMatchObject({ sent: 2 });
-    expect(sends).toHaveLength(1); // only the listed number reached the real sender
-    expect(await OutboxMessageModel.findOne({ toRef: other.phone })).toMatchObject({ simulated: true });
-    expect(await OutboxMessageModel.findOne({ toRef: patient.phone })).toMatchObject({ simulated: false });
-  });
-
-  it("a failed send falls back to SMS; with no fallback the job fails with detail and can be retried", async () => {
+  it("a failed send falls back to SMS; with no gateway the job fails with detail and can be retried", async () => {
     setWhatsAppTransport({ name: "meta", send: async () => ({ ok: false, error: "(#131026) Message undeliverable" }) });
+    setSmsProvider({ name: "test-gateway", send: async () => ({ ok: true, messageId: "SMS.1" }) });
     world.set("a1", { valid: true });
     await plan("a1");
     expect(await dispatchDue(NOW())).toMatchObject({ sent: 1 });
@@ -288,14 +260,18 @@ describe("automation engine", () => {
       ["sms", "sent"],
     ]);
 
-    await settings({ smsFallbackEnabled: false });
+    setSmsProvider(null); // no gateway connected → the SMS attempt fails honestly too
     world.set("a2", { valid: true });
     await plan("a2", { serial: 2 });
     expect(await dispatchDue(NOW())).toMatchObject({ failed: 1 });
     const failed = await AutomationJobModel.findOne({ scopeId: "a2" });
     expect(failed).toMatchObject({ status: "failed" });
-    expect(failed!.lastError).toMatch(/undeliverable/);
-    expect(failed!.sendAttempts[0]).toMatchObject({ channel: "whatsapp", result: "failed" });
+    expect(failed!.lastError).toMatch(/No SMS gateway/);
+    expect(failed!.sendAttempts[0].error).toMatch(/undeliverable/);
+    expect(failed!.sendAttempts.map((a) => [a.channel, a.result])).toEqual([
+      ["whatsapp", "failed"],
+      ["sms", "failed"],
+    ]);
 
     setWhatsAppTransport(metaSpy);
     expect(await retryJob(failed!._id, { now: true })).toBe("sent");

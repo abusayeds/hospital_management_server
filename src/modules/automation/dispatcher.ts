@@ -271,7 +271,7 @@ const afterSend = async (
       outboxMessage: outbox._id,
       lastError: outbox.error ?? "Send failed",
     });
-  const outcome = await finish(job, "sent", "sent", `${outbox.channel}${outbox.simulated ? " (simulated)" : ""}`, {
+  const outcome = await finish(job, "sent", "sent", outbox.channel, {
     outboxMessage: outbox._id,
     sentAt: new Date(),
     lastError: null,

@@ -30,7 +30,7 @@ export interface IChatMessage {
   latencyMs?: number | null;
   model?: string | null;
   guardFlags: string[]; // output guard findings (e.g. "dosage_pattern")
-  channelPayload?: unknown; // what was actually sent to the channel (e.g. WhatsApp JSON) — debugging + simulator
+  channelPayload?: unknown; // what was actually sent to the channel (e.g. WhatsApp JSON) — debugging
   createdAt?: Date;
 }
 

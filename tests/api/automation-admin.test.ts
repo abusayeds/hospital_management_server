@@ -7,10 +7,12 @@ import { getRule } from "../../src/modules/automation/rules/registry";
 import { ensureDefaultTemplates } from "../../src/modules/automation/templates/template.service";
 import { addDays, todayInDhaka } from "../../src/utils/date";
 import { createAppointment, createClinic, createPatients } from "../fixtures";
+import { useFakeWhatsApp } from "../fake-whatsapp";
 import { createUser, signIn, useTestDatabase } from "../helpers";
 
 describe("automation admin API", () => {
   useTestDatabase();
+  useFakeWhatsApp();
 
   const admin = async () => {
     await createUser({ role: "super_admin", email: "admin@test.local" });
@@ -21,7 +23,7 @@ describe("automation admin API", () => {
     await ensureDefaultTemplates();
     await HospitalSettingsModel.updateOne(
       { key: "default" },
-      { $set: { quietHoursStart: "00:00", quietHoursEnd: "00:00", simulateWhatsApp: true } },
+      { $set: { quietHoursStart: "00:00", quietHoursEnd: "00:00" } },
     );
     clearSettingsCache();
   });
@@ -116,14 +118,14 @@ describe("automation admin API", () => {
     expect(cancelled.body.data.status).toBe("cancelled");
   });
 
-  it("settings: switch simulation and quiet hours; health reports the queue", async () => {
+  it("settings: quiet hours and SMS fallback; health reports the queue", async () => {
     const a = await admin();
     const res = await a
       .patch("/api/v1/automation/settings")
-      .send({ simulateWhatsApp: false, quietHoursStart: "22:00" });
-    expect(res.body.data).toMatchObject({ simulateWhatsApp: false, quietHoursStart: "22:00" });
+      .send({ smsFallbackEnabled: false, quietHoursStart: "22:00" });
+    expect(res.body.data).toMatchObject({ smsFallbackEnabled: false, quietHoursStart: "22:00" });
     const health = await a.get("/api/v1/automation/health");
-    expect(health.body.data).toMatchObject({ queueDepth: 0, simulation: { whatsapp: false } });
+    expect(health.body.data).toMatchObject({ queueDepth: 0, whatsappConfigured: true });
   });
 
   it("preview world lists what would be sent without storing anything", async () => {

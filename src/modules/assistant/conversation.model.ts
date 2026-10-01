@@ -51,7 +51,6 @@ export interface IConversation {
   lastPreview?: string;
   unreadCount: number; // inbound messages staff have not opened yet
   runningSummary?: string;
-  simulated: boolean; // WhatsApp simulator conversation: replies go to the simulator, never to Meta
   lastOptions: { n: number; id: string; label: string }[]; // numbered-text fallback ("reply 2") on WhatsApp
   metrics: { messageCount: number; toolCallCount: number; bookingsCreated: number; handoverCount: number };
   createdAt?: Date;
@@ -100,7 +99,6 @@ const ConversationSchema = new Schema<IConversation>(
     lastPreview: { type: String, maxlength: 200, default: "" },
     unreadCount: { type: Number, default: 0 },
     runningSummary: { type: String, maxlength: 2000, default: "" },
-    simulated: { type: Boolean, default: false },
     lastOptions: { type: [{ n: Number, id: String, label: String, _id: false }], default: [] },
     metrics: {
       messageCount: { type: Number, default: 0 },

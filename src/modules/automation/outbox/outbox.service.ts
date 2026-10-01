@@ -1,9 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Types } from "mongoose";
 import type { Permission } from "../../../config/permissions";
-import { env } from "../../../config/env";
 import { emitToPermission } from "../../../sockets";
-import { logger } from "../../../utils/logger";
 import type { OutboundMessage } from "../../assistant/assistant.types";
 import { ChatMessageModel } from "../../assistant/chatMessage.model";
 import { ConversationModel } from "../../assistant/conversation.model";
@@ -12,8 +10,7 @@ import { renderForWhatsApp } from "../../assistant/channels/whatsapp/render";
 import { getSettings } from "../../hospital/settings/settings.service";
 import { PatientModel } from "../../patients/patient.model";
 import { OutboxButton, OutboxMessageDocument, OutboxMessageModel, OutboxSource } from "../models/outbox.model";
-import { applyDeliveryStatus } from "./record";
-import { smsProviderFor } from "./sms";
+import { smsProvider } from "./sms";
 
 /**
  * OUTBOX SERVICE — the ONLY way automation (and admin test sends) reach a patient.
@@ -23,8 +20,7 @@ import { smsProviderFor } from "./sms";
  *   outside it → only the Meta-approved TEMPLATE (name + language + {{1}}, {{2}} parameters)
  * The message is also stored in the patient's WhatsApp conversation, so a reply ("Confirm", "STOP",
  * free text) lands in the SAME conversation the chatbot already knows.
- * Simulation mode (settings, per channel) swaps the transport for a dry-run adapter that never calls
- * Meta or an SMS gateway and fakes delivered/read statuses a moment later.
+ * Every message is sent for real; delivered / read come back from Meta's status webhook.
  */
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -62,32 +58,10 @@ export type SendOutcome = {
   attempts: { channel: string; result: "sent" | "failed"; error?: string | null }[];
 };
 
-// ------------------------------------------------------------------ simulation: fake delivery statuses
-
-export const simulationTiming = { enabled: env.NODE_ENV !== "test", deliveredMs: 1500, readMs: 5000 };
-
-const fakeStatus = async (providerMessageId: string, status: "delivered" | "read") => {
-  try {
-    await applyDeliveryStatus(providerMessageId, status);
-    await ChatMessageModel.updateOne(
-      { externalMessageId: providerMessageId, deliveryStatus: { $ne: "failed" } },
-      { $set: { deliveryStatus: status } },
-    );
-  } catch (err) {
-    logger.warn({ err: (err as Error).message }, "Simulated delivery status not stored");
-  }
-};
-
-const simulateDelivery = (providerMessageId: string) => {
-  if (!simulationTiming.enabled) return;
-  setTimeout(() => void fakeStatus(providerMessageId, "delivered"), simulationTiming.deliveredMs).unref();
-  setTimeout(() => void fakeStatus(providerMessageId, "read"), simulationTiming.readMs).unref();
-};
-
 // ------------------------------------------------------------------ WhatsApp
 
 /** The patient's WhatsApp conversation (created on first contact, already verified: we chose the number) */
-const conversationFor = async (phone: string, simulated: boolean) => {
+const conversationFor = async (phone: string) => {
   const channelUserId = phone.replace(/^\+/, "");
   const linked = (await PatientModel.find({ phone }).select("_id").lean<any[]>()).map((p) => p._id);
   return (await ConversationModel.findOneAndUpdate(
@@ -101,7 +75,6 @@ const conversationFor = async (phone: string, simulated: boolean) => {
         verifiedPhone: phone,
         verifiedAt: new Date(),
         linkedPatientIds: linked,
-        simulated,
       },
     },
     { upsert: true, new: true },
@@ -130,9 +103,8 @@ export const templatePayload = (tpl: TemplateRef, params: string[], buttons: Out
   };
 };
 
-const sendWhatsApp = async (input: PatientSend, simulateSetting: boolean, params: string[]) => {
-  const conv = await conversationFor(input.phone, simulateSetting);
-  const simulated = simulateSetting || Boolean(conv.simulated);
+const sendWhatsApp = async (input: PatientSend, params: string[]) => {
+  const conv = await conversationFor(input.phone);
   const inside = Boolean(conv.lastInboundAt && Date.now() - new Date(conv.lastInboundAt).getTime() < WINDOW_MS);
 
   let messageKind: "session" | "template";
@@ -178,14 +150,13 @@ const sendWhatsApp = async (input: PatientSend, simulateSetting: boolean, params
     messageKind,
     whatsappTemplateName: messageKind === "template" ? input.template?.whatsappTemplateName : null,
     status: "sending",
-    simulated,
     conversation: conv._id,
     chatMessage: chat._id,
     replyWindowClosesAt: conv.lastInboundAt ? new Date(new Date(conv.lastInboundAt).getTime() + WINDOW_MS) : null,
     payload: payloads,
   })) as OutboxMessageDocument;
 
-  const transport = transportFor(simulated);
+  const transport = transportFor();
   let firstId: string | null = null;
   let error: string | null = null;
   for (const p of payloads) {
@@ -215,7 +186,6 @@ const sendWhatsApp = async (input: PatientSend, simulateSetting: boolean, params
       $inc: { "metrics.messageCount": 1 },
     },
   );
-  if (!error && firstId && simulated) simulateDelivery(firstId);
   return error ? { ok: false as const, error, outbox } : { ok: true as const, outbox };
 };
 
@@ -253,21 +223,18 @@ export const sendToPatientPhone = async (input: PatientSend): Promise<SendOutcom
 
   for (const channel of input.channels) {
     if (channel === "whatsapp") {
-      // Test safety: with a live-recipient list, numbers outside it stay in the simulator
-      const liveList = settings.whatsappLiveRecipients ?? [];
-      const simulate = settings.simulateWhatsApp || (liveList.length > 0 && !liveList.includes(input.phone));
-      if (!simulate && !isWhatsAppConfigured()) {
+      if (!isWhatsAppConfigured()) {
         attempts.push({ channel, result: "failed", error: "WhatsApp is not configured" });
         continue;
       }
-      const r = await sendWhatsApp(input, simulate, params);
+      const r = await sendWhatsApp(input, params);
       if (r.outbox) last = r.outbox;
       attempts.push({ channel, result: r.ok ? "sent" : "failed", error: r.ok ? null : r.error });
       if (r.ok) return { outbox: r.outbox, attempts };
     }
     if (channel === "sms") {
       if (!settings.smsFallbackEnabled) continue;
-      const provider = smsProviderFor(settings.simulateSms);
+      const provider = smsProvider();
       const r = await provider.send(input.phone, input.text);
       const outbox = (await OutboxMessageModel.create({
         ...baseRow(input),
@@ -278,15 +245,11 @@ export const sendToPatientPhone = async (input: PatientSend): Promise<SendOutcom
         providerMessageId: r.ok ? r.messageId : null,
         error: r.ok ? null : r.error,
         sentAt: r.ok ? new Date() : null,
-        simulated: !provider.real,
         deliveryUpdates: [{ status: r.ok ? "sent" : "failed", at: new Date(), error: r.ok ? null : r.error }],
       })) as OutboxMessageDocument;
       last = outbox;
       attempts.push({ channel, result: r.ok ? "sent" : "failed", error: r.ok ? null : r.error });
-      if (r.ok) {
-        if (!provider.real) simulateDelivery(outbox.providerMessageId!);
-        return { outbox, attempts };
-      }
+      if (r.ok) return { outbox, attempts };
     }
   }
 
@@ -366,7 +329,7 @@ export const sendRawWhatsApp = async (input: {
 }) => {
   const to = input.phone.replace(/^\+/, "");
   const payload = toPayload(to, input.body);
-  const r = await transportFor(false).send(payload);
+  const r = await transportFor().send(payload);
   await OutboxMessageModel.create({
     toType: "patient",
     toRef: input.phone,

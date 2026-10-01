@@ -21,7 +21,6 @@ type ConvLike = {
   linkedPatientIds?: unknown[];
   language?: string;
   lastInboundAt?: Date | null;
-  simulated?: boolean;
 };
 
 type MessageLike = {
@@ -73,7 +72,6 @@ export const recordChatSend = async (conv: ConvLike, messages: MessageLike[]) =>
           providerMessageId: m.externalMessageId ?? null,
           error: m.deliveryError ?? null,
           deliveryUpdates: [{ status, at: new Date(), error: m.deliveryError ?? null }],
-          simulated: Boolean(conv.simulated),
           relatedType: "conversation",
           relatedId: String(conv._id),
           conversation: conv._id,

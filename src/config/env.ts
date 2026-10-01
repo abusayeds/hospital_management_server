@@ -103,7 +103,7 @@ const envSchema = z.object({
   AI_EMBEDDING_DIMENSIONS: z.coerce.number().int().min(64).max(3072).default(768),
   KNOWLEDGE_VECTOR_INDEX: z.string().default("knowledge_vector_index"),
 
-  // WhatsApp Cloud API (Phase 5). All empty = the WhatsApp channel is off (the simulator still works).
+  // WhatsApp Cloud API (Phase 5). All empty = the WhatsApp channel is off.
   WHATSAPP_PHONE_NUMBER_ID: optionalString,
   WHATSAPP_ACCESS_TOKEN: optionalString,
   WHATSAPP_VERIFY_TOKEN: optionalString, // any secret string; the same value is typed in the Meta webhook settings

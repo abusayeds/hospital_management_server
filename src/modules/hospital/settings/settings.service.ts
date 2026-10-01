@@ -1,5 +1,5 @@
 import { Request } from "express";
-import { env, isProduction } from "../../../config/env";
+import { env } from "../../../config/env";
 import { serialize } from "../../../utils/serialize";
 import { recordAudit } from "../../audit/audit.service";
 import { HospitalSettingsModel, IHospitalSettings } from "./settings.model";
@@ -35,10 +35,6 @@ const defaults = (): HospitalSettings => ({
   automationDailyBudget: 500,
   perPhoneDailyCap: 3,
   dedupeWindowMinutes: 30,
-  // Simulation is ON outside production so a demo never messages real phones by accident
-  simulateWhatsApp: !isProduction,
-  simulateSms: !isProduction,
-  whatsappLiveRecipients: [],
   smsFallbackEnabled: true,
   failureAlertThreshold: 5,
 });

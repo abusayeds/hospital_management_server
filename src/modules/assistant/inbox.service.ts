@@ -62,7 +62,6 @@ const listItem = (c: any) => ({
   unreadCount: c.unreadCount ?? 0,
   handoverReason: c.handoverReason ?? null,
   assignedTo: c.assignedTo?.name ? { id: String(c.assignedTo._id), name: c.assignedTo.name } : null,
-  simulated: Boolean(c.simulated),
 });
 
 export const listConversations = async (f: {

@@ -1,4 +1,3 @@
-import { randomBytes } from "crypto";
 import { env } from "../../../../config/env";
 import { logger } from "../../../../utils/logger";
 import type { WaBody } from "./render";
@@ -7,7 +6,7 @@ import type { WaBody } from "./render";
  * WHATSAPP CLOUD API CLIENT.
  *  - disabled cleanly when the env variables are missing (isWhatsAppConfigured() === false)
  *  - retries transient failures (network, 429, 5xx) with exponential backoff; 4xx are final
- *  - the SIMULATOR transport captures payloads instead of calling Meta (same code path otherwise)
+ *  - every message goes to Meta for real; automated tests swap the transport (setWhatsAppTransport)
  */
 
 export const isWhatsAppConfigured = () =>
@@ -20,7 +19,7 @@ const graphUrl = () =>
 
 export type SendResult = { ok: true; messageId: string } | { ok: false; error: string };
 
-export type Transport = { name: "meta" | "simulator"; send: (payload: Record<string, unknown>) => Promise<SendResult> };
+export type Transport = { name: string; send: (payload: Record<string, unknown>) => Promise<SendResult> };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export const retrySettings = { attempts: 3, baseDelayMs: 500 };
@@ -54,22 +53,13 @@ const metaTransport: Transport = {
   },
 };
 
-/** Simulator: nothing leaves the server; the payload is stored on the message and shown in the admin phone UI */
-export const simulatorTransport: Transport = {
-  name: "simulator",
-  async send() {
-    return { ok: true, messageId: `wamid.SIM.${randomBytes(8).toString("hex")}` };
-  },
-};
-
 let metaOverride: Transport | null = null;
-/** Tests replace the Meta transport so nothing is sent over the internet */
+/** Automated tests replace the Meta transport so nothing is sent over the internet */
 export const setWhatsAppTransport = (t: Transport | null) => {
   metaOverride = t;
 };
 
-export const transportFor = (simulated: boolean): Transport =>
-  simulated ? simulatorTransport : (metaOverride ?? metaTransport);
+export const transportFor = (): Transport => metaOverride ?? metaTransport;
 
 /** Full request body for one message to one number */
 export const toPayload = (to: string, body: WaBody) => ({
@@ -81,7 +71,7 @@ export const toPayload = (to: string, body: WaBody) => ({
 
 /** Blue ticks: tell WhatsApp we read the patient's message (best effort) */
 export const markAsRead = async (messageId: string) => {
-  if (!isWhatsAppConfigured() || messageId.startsWith("wamid.SIM.")) return;
+  if (!isWhatsAppConfigured() || metaOverride) return;
   await fetch(graphUrl(), {
     method: "POST",
     headers: { Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`, "Content-Type": "application/json" },

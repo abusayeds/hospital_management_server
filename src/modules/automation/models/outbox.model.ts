@@ -37,7 +37,6 @@ export interface IOutboxMessage {
   providerMessageId?: string | null;
   error?: string | null;
   deliveryUpdates: DeliveryUpdate[];
-  simulated: boolean; // dry-run adapter: never reached Meta / an SMS gateway
   cost?: number | null; // reserved for Phase 7 billing of messaging costs
   relatedType?: "appointment" | "visit" | "lab_order" | "conversation" | "doctor" | "system" | null;
   relatedId?: string | null;
@@ -47,7 +46,7 @@ export interface IOutboxMessage {
   chatMessage?: Types.ObjectId | null;
   createdBy?: Types.ObjectId | null; // staff user for staff replies and test sends; null = system
   replyWindowClosesAt?: Date | null; // WhatsApp 24 h customer-service window at send time
-  payload?: unknown; // what was handed to the provider (debugging + simulator)
+  payload?: unknown; // what was handed to the provider (debugging)
   retryOf?: Types.ObjectId | null;
   repliedAt?: Date | null; // the patient answered this message (button or typed)
   replyAction?: string | null; // confirm / reschedule / cancel / rebook / book / stop …
@@ -86,7 +85,6 @@ const OutboxSchema = new Schema<IOutboxMessage>(
       ],
       default: [],
     },
-    simulated: { type: Boolean, default: false },
     cost: { type: Number, default: null },
     relatedType: { type: String, default: null },
     relatedId: { type: String, default: null },

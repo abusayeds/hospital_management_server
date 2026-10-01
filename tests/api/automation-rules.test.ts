@@ -53,7 +53,7 @@ describe("automation rules", () => {
     await ensureDefaultTemplates();
     await HospitalSettingsModel.updateOne(
       { key: "default" },
-      { $set: { quietHoursStart: "00:00", quietHoursEnd: "00:00", simulateWhatsApp: true, dedupeWindowMinutes: 0 } },
+      { $set: { quietHoursStart: "00:00", quietHoursEnd: "00:00", dedupeWindowMinutes: 0 } },
     );
     clearSettingsCache();
   });

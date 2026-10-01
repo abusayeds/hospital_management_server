@@ -7,16 +7,18 @@ import { AutomationJobModel } from "../../src/modules/automation/models/job.mode
 import { AutomationRuleSettingModel } from "../../src/modules/automation/models/ruleSetting.model";
 import { ensureDefaultTemplates } from "../../src/modules/automation/templates/template.service";
 import { createPatients } from "../fixtures";
+import { useFakeWhatsApp } from "../fake-whatsapp";
 import { createUser, signIn, useTestDatabase } from "../helpers";
 
 describe("patient message preferences", () => {
   useTestDatabase();
+  useFakeWhatsApp();
 
   beforeEach(async () => {
     await ensureDefaultTemplates();
     await HospitalSettingsModel.updateOne(
       { key: "default" },
-      { $set: { quietHoursStart: "00:00", quietHoursEnd: "00:00", simulateWhatsApp: true } },
+      { $set: { quietHoursStart: "00:00", quietHoursEnd: "00:00" } },
     );
     clearSettingsCache();
   });
