@@ -48,6 +48,7 @@ const updateSettingsSchema = z.object({
         .max(24 * 60),
       smsFallbackEnabled: z.boolean(),
       failureAlertThreshold: z.number().int().min(1).max(1000),
+      dailyCollectionTarget: z.number().int().min(0).max(100_000_000_00),
     })
     .partial(),
 });

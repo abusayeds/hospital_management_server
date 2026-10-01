@@ -35,6 +35,7 @@ export interface IHospitalSettings extends IBaseFields {
   dedupeWindowMinutes: number; // identical text to the same phone inside this window is suppressed
   smsFallbackEnabled: boolean; // try SMS when WhatsApp cannot deliver
   failureAlertThreshold: number; // alert admins when this many sends fail within an hour
+  dailyCollectionTarget: number; // poisha; 0 = no target (management dashboard progress)
 }
 
 const HospitalSettingsSchema = new Schema<IHospitalSettings>({
@@ -66,6 +67,7 @@ const HospitalSettingsSchema = new Schema<IHospitalSettings>({
   dedupeWindowMinutes: { type: Number, default: 30, min: 0, max: 24 * 60 },
   smsFallbackEnabled: { type: Boolean, default: true },
   failureAlertThreshold: { type: Number, default: 5, min: 1, max: 1000 },
+  dailyCollectionTarget: { type: Number, default: 0, min: 0, max: 100_000_000_00 },
 });
 HospitalSettingsSchema.plugin(basePlugin);
 

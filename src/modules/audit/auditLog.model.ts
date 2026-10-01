@@ -18,6 +18,8 @@ export const AUDIT_ACTIONS = [
   "PASSWORD_CHANGE",
   "PASSWORD_RESET",
   "PERMISSION_DENIED",
+  "EXPORT",
+  "IP_BLOCKED",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

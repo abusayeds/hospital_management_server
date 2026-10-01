@@ -37,6 +37,7 @@ const defaults = (): HospitalSettings => ({
   dedupeWindowMinutes: 30,
   smsFallbackEnabled: true,
   failureAlertThreshold: 5,
+  dailyCollectionTarget: 0,
 });
 
 // Settings are read on every booking; cache them in memory and drop the cache on update.

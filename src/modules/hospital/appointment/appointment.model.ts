@@ -119,6 +119,9 @@ AppointmentSchema.index(
 AppointmentSchema.index({ date: 1, doctor: 1, status: 1 });
 AppointmentSchema.index({ date: 1, status: 1 });
 AppointmentSchema.index({ patient: 1, date: -1 });
+// Management analytics: bookings by channel, and booking lead time
+AppointmentSchema.index({ source: 1, date: 1 });
+AppointmentSchema.index({ createdAt: 1, status: 1 });
 
 AppointmentSchema.plugin(basePlugin);
 
