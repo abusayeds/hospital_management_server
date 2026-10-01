@@ -57,6 +57,12 @@ export type DomainEventMap = {
   "chat.message_received": { conversationId: Id; channel: string };
   "chat.booking_created": { conversationId: Id; appointmentId: Id; patientId: Id; channel: string };
   "chat.handover_requested": { conversationId: Id; channel: string; reason: string; emergency: boolean };
+  // Billing (Phase 7) — amounts are integer poisha
+  "invoice.issued": { invoiceId: Id; patientId: Id; total: number };
+  "payment.collected": { invoiceId: Id; patientId: Id; paymentId: string; amount: number; method: string };
+  "invoice.refunded": { invoiceId: Id; patientId: Id; amount: number };
+  // AI daily report (Phase 7)
+  "report.daily_generated": { reportId: Id; date: IsoDate; source: "ai" | "fallback" };
 };
 
 export type DomainEventName = keyof DomainEventMap;
@@ -76,6 +82,10 @@ export const DOMAIN_EVENT_NAMES = [
   "chat.message_received",
   "chat.booking_created",
   "chat.handover_requested",
+  "invoice.issued",
+  "payment.collected",
+  "invoice.refunded",
+  "report.daily_generated",
 ] as const satisfies readonly DomainEventName[];
 
 export type DomainEvent<N extends DomainEventName = DomainEventName> = {

@@ -23,6 +23,7 @@ import { LabRoutes } from "../modules/clinical/lab/lab.route";
 import { AiSummaryRoutes } from "../modules/clinical/ai-summary/aiSummary.route";
 import { VerifyRoutes } from "../documents/verify.route";
 import { HealthRoutes } from "./health.route";
+import { FinanceReportRoutes, InvoiceRoutes } from "../modules/billing/invoice.route";
 import { AutomationRoutes } from "../modules/automation/automation.route";
 import "../modules/automation"; // registers automation rules on the event bus
 
@@ -58,6 +59,8 @@ const moduleRoutes: { path: string; route: express.Router }[] = [
   { path: "/queue", route: QueueRoutes },
   { path: "/display", route: DisplayRoutes },
   { path: "/dashboard", route: DashboardRoutes },
+  { path: "/invoices", route: InvoiceRoutes },
+  { path: "/reports", route: FinanceReportRoutes },
   { path: "/automation", route: AutomationRoutes },
   { path: "/assistant/web", route: WebChatRoutes },
   { path: "/knowledge", route: KnowledgeRoutes },

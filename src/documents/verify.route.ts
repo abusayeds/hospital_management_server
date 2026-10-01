@@ -14,7 +14,7 @@ import { verifyDocumentCode } from "./signing";
  */
 
 export type VerifiedDocument = {
-  type: "prescription" | "lab_report";
+  type: "prescription" | "lab_report" | "receipt";
   number: string;
   date: string;
   issuedBy: string; // doctor / lab
