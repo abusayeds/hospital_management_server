@@ -18,6 +18,7 @@ import { PatientRoutes } from "../modules/patients/patient.route";
 import { UserRoutes } from "../modules/users/user.route";
 import { AnalyticsRoutes } from "../modules/analytics/analytics.route";
 import { DailyReportRoutes } from "../modules/reports/report.route";
+import { SecurityRoutes } from "../modules/security/security.route";
 import { EventRoutes } from "../events/events.route";
 import { VitalsRoutes } from "../modules/clinical/vitals/vitals.route";
 import { VisitRoutes } from "../modules/clinical/visits/visit.route";
@@ -65,6 +66,7 @@ const moduleRoutes: { path: string; route: express.Router }[] = [
   { path: "/reports", route: FinanceReportRoutes },
   { path: "/reports", route: DailyReportRoutes },
   { path: "/analytics", route: AnalyticsRoutes },
+  { path: "/security", route: SecurityRoutes },
   { path: "/automation", route: AutomationRoutes },
   { path: "/assistant/web", route: WebChatRoutes },
   { path: "/knowledge", route: KnowledgeRoutes },

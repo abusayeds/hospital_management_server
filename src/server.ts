@@ -1,6 +1,8 @@
 // env must load first: it validates .env and exits with a clear message if invalid
 import { env } from "./config/env";
+import fs from "fs";
 import http from "http";
+import https from "https";
 import app from "./app";
 import { connectDatabase, disconnectDatabase } from "./config/database";
 import { seedReferenceData } from "./DB";
@@ -12,7 +14,12 @@ import { closePdfBrowser } from "./documents/pdf";
 import { closeSocketIO, initSocketIO } from "./sockets";
 import { logger } from "./utils/logger";
 
-const server = http.createServer(app);
+// HTTPS directly when a certificate is configured; otherwise plain HTTP behind an HTTPS proxy
+// (production refuses to start without one of the two — see config/env.ts)
+const server =
+  env.TLS_CERT_PATH && env.TLS_KEY_PATH
+    ? https.createServer({ cert: fs.readFileSync(env.TLS_CERT_PATH), key: fs.readFileSync(env.TLS_KEY_PATH) }, app)
+    : http.createServer(app);
 let shuttingDown = false;
 
 async function main() {
@@ -27,7 +34,9 @@ async function main() {
 
   initSocketIO(server);
   server.listen(env.PORT, () => {
-    logger.info(`Testolife API listening on http://localhost:${env.PORT} (${env.NODE_ENV})`);
+    logger.info(
+      `Testolife API listening on ${env.TLS_CERT_PATH ? "https" : "http"}://localhost:${env.PORT} (${env.NODE_ENV})`,
+    );
   });
 }
 

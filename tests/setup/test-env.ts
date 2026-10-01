@@ -11,6 +11,12 @@ process.env.BCRYPT_ROUNDS = "4"; // fast hashing in tests only
 process.env.REFRESH_REUSE_GRACE_SECONDS = "0"; // any reuse counts as theft in tests
 process.env.AUTH_RATE_LIMIT_MAX = "1000";
 process.env.RATE_LIMIT_MAX = "10000";
+// Phase 7 limits: high in tests; tests/api/security.test.ts checks them with low values
+process.env.REFRESH_RATE_LIMIT_MAX = "1000";
+process.env.CHANGE_PASSWORD_RATE_LIMIT_MAX = "1000";
+process.env.USER_WRITE_LIMIT_PER_HOUR = "100000";
+process.env.USER_READ_LIMIT_PER_HOUR = "100000";
+process.env.CHAT_HOURLY_LIMIT = "1000";
 process.env.DNS_SERVERS = "";
 process.env.DEMO_PASSWORD = "";
 process.env.ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";

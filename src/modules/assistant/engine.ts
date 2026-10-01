@@ -17,6 +17,7 @@ import { refFor } from "./refs";
 import { guardOutput, preChecks } from "./safety";
 import { runTool, toolDefinitions } from "./tools";
 import type { ToolContext } from "./tools/types";
+import { env } from "../../config/env";
 import { z } from "zod";
 
 /**
@@ -240,6 +241,14 @@ const refreshSummary = async (conv: ConversationDocument) => {
   }
 };
 
+/** Patient messages in this conversation in the last hour (one WhatsApp number or one web session) */
+const patientMessagesLastHour = (conv: ConversationDocument) =>
+  ChatMessageModel.countDocuments({
+    conversation: conv._id,
+    sender: "patient",
+    createdAt: { $gte: new Date(Date.now() - 60 * 60 * 1000) },
+  });
+
 // ------------------------------------------------------------------ entry point
 
 export const handleInbound = async (inbound: InboundMessage): Promise<EngineResult> => {
@@ -304,6 +313,7 @@ export const handleInbound = async (inbound: InboundMessage): Promise<EngineResu
       flags: [],
     };
   } else {
+    let recentMessages = 0;
     const pre = await preChecks(conv, text);
     const tapped = pre ? null : await handleInteraction(conv, inbound.replyId, text);
     if (pre) outcome = { messages: pre.messages, toolLogs: [], flags: [pre.flag] };
@@ -319,6 +329,24 @@ export const handleInbound = async (inbound: InboundMessage): Promise<EngineResu
         ],
         toolLogs: [],
         flags: [],
+      };
+    } else if ((recentMessages = await patientMessagesLastHour(conv)) > env.CHAT_HOURLY_LIMIT) {
+      // Over the hourly limit: one polite notice, then quiet. Staff still see every message in the inbox.
+      const notice = recentMessages === env.CHAT_HOURLY_LIMIT + 1;
+      outcome = {
+        messages: notice
+          ? [
+              {
+                type: "quick_replies",
+                text:
+                  "আপনি অল্প সময়ে অনেক মেসেজ পাঠিয়েছেন। কিছুক্ষণ পরে আবার লিখুন, অথবা একজন স্টাফের সাথে কথা বলুন।\n" +
+                  "You have sent many messages in a short time. Please try again a little later, or talk to a person.",
+                options: [{ id: "menu|human", label: "মানুষের সাথে কথা বলুন · Talk to a person" }],
+              },
+            ]
+          : [],
+        toolLogs: [],
+        flags: ["rate_limited"],
       };
     } else {
       try {

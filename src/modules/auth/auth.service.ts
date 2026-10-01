@@ -5,6 +5,7 @@ import { permissionsForRole } from "../../config/permissions";
 import AppError from "../../errors/AppError";
 import { disconnectUser } from "../../sockets";
 import { recordAudit } from "../audit/audit.service";
+import { noteFailedLogin } from "../security/security.service";
 import { UserDocument, UserModel } from "../users/user.model";
 import { RefreshTokenModel } from "./refreshToken.model";
 import { generateRefreshToken, hashToken, newSessionId, refreshTtlMs, signAccessToken } from "./tokens";
@@ -60,6 +61,7 @@ export const login = async (email: string, password: string, req: Request) => {
 
   if (!user) {
     await bcrypt.compare(password, await getDummyHash());
+    noteFailedLogin(req.ip);
     await recordAudit({ req, action: "LOGIN_FAILED", entityType: "Auth", meta: { email, reason: "unknown_email" } });
     throw new AppError(401, INVALID_CREDENTIALS, "INVALID_CREDENTIALS");
   }
@@ -67,6 +69,7 @@ export const login = async (email: string, password: string, req: Request) => {
   const now = Date.now();
   if (user.lockUntil && user.lockUntil.getTime() > now) {
     const retryAfterSeconds = Math.ceil((user.lockUntil.getTime() - now) / 1000);
+    noteFailedLogin(req.ip);
     await recordAudit({
       req,
       actor: actorOf(user),
@@ -97,6 +100,7 @@ export const login = async (email: string, password: string, req: Request) => {
         retryAfterSeconds: LOCK_MINUTES * 60,
       });
     }
+    noteFailedLogin(req.ip);
     await recordAudit({
       req,
       actor: actorOf(user),

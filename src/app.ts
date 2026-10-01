@@ -2,10 +2,11 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { Application, Request, Response } from "express";
 import helmet from "helmet";
-import { env } from "./config/env";
+import { env, isProduction } from "./config/env";
+import AppError from "./errors/AppError";
 import globalErrorHandler from "./middlewares/globalErrorHandler";
 import notFound from "./middlewares/notFound";
-import { generalLimiter } from "./middlewares/rateLimiter";
+import { generalLimiter, ipGuard, userReadLimiter, userWriteLimiter } from "./middlewares/rateLimiter";
 import { sanitizeRequest } from "./middlewares/sanitize";
 import { verifyOrigin } from "./middlewares/verifyOrigin";
 import router from "./routes";
@@ -21,43 +22,85 @@ app.set("trust proxy", parseTrustProxy(env.TRUST_PROXY));
 // 1. Log every request, including ones rejected by later middleware
 app.use(httpLogger);
 
-// 2. Secure HTTP headers (CSP, no-sniff, frameguard, hides X-Powered-By, ...)
-app.use(helmet());
+// 2. Production: HTTPS only. Behind a proxy, X-Forwarded-Proto tells us (trust proxy above).
+//    Page loads are redirected; API calls over plain HTTP are refused (a redirect would leak the body).
+if (isProduction)
+  app.use((req, res, next) => {
+    if (req.secure) return next();
+    if (req.method === "GET" || req.method === "HEAD")
+      return res.redirect(308, `https://${req.get("host")}${req.originalUrl}`);
+    next(new AppError(403, "HTTPS is required.", "FORBIDDEN"));
+  });
 
-// 3. Only our frontend may call the API from a browser, with cookies
+// 3. Secure HTTP headers. The API serves JSON and PDFs only, so the CSP is very strict.
 app.use(
-  cors({
-    origin: env.CLIENT_URL,
-    credentials: true,
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'none'"],
+        imgSrc: ["'self'", "data:"],
+        styleSrc: ["'self'", "'unsafe-inline'"], // PDF viewer and /public files only
+        fontSrc: ["'self'", "data:"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'none'"],
+        formAction: ["'none'"],
+        objectSrc: ["'none'"],
+        ...(isProduction ? { upgradeInsecureRequests: [] } : {}),
+      },
+    },
+    // HSTS only in production (it would pin localhost to HTTPS in development)
+    strictTransportSecurity: isProduction
+      ? { maxAge: 365 * 24 * 60 * 60, includeSubDomains: true, preload: true }
+      : false,
+    referrerPolicy: { policy: "no-referrer" },
+    crossOriginResourcePolicy: { policy: "same-site" },
   }),
 );
 
-// 4. Parse bodies, with a size cap so huge payloads cannot exhaust memory.
+// 4. Only our frontend may call the API from a browser, with cookies. Other origins (including
+//    their preflight requests) get a 403 instead of a silent response without CORS headers.
+app.use(
+  cors({
+    origin: (origin, callback) =>
+      !origin || env.CLIENT_URL.includes(origin)
+        ? callback(null, true)
+        : callback(new AppError(403, "This origin is not allowed to call the API.", "FORBIDDEN")),
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allowedHeaders: ["Content-Type", "X-Requested-With"],
+    maxAge: 600,
+  }),
+);
+
+// 5. Parse bodies, with a size cap so huge payloads cannot exhaust memory.
 // The WhatsApp webhook keeps the RAW body: its HMAC signature is computed over the exact bytes.
 app.use("/api/v1/webhooks/whatsapp", express.raw({ type: "*/*", limit: "1mb" }));
 app.use(express.json({ limit: env.JSON_BODY_LIMIT }));
 app.use(express.urlencoded({ extended: false, limit: env.JSON_BODY_LIMIT }));
 app.use(cookieParser());
 
-// 5. Strip MongoDB operators ($gt, $where, ...) from user input
+// 6. Strip MongoDB operators ($gt, $where, ...) from user input
 app.use(sanitizeRequest);
 
-// 6. CSRF: reject state-changing requests coming from other websites
+// 7. CSRF: reject state-changing requests coming from other websites
 app.use("/api", verifyOrigin);
 
-// 7. Throttle abusive clients
+// 8. Throttle abusive clients: blocked IPs and the IP circuit breaker first, then per IP and per user
+app.use("/api", ipGuard);
 app.use("/api", generalLimiter);
+app.use("/api", userWriteLimiter, userReadLimiter);
 
 app.use("/public", express.static("public"));
 
-// 8. Versioned API
+// 9. Versioned API
 app.use("/api/v1", router);
 
 app.get("/", (_req: Request, res: Response) => {
   res.json({ name: "Testolife API", docs: "/api/v1/health" });
 });
 
-// 9. Unknown routes, then the single error handler (must be registered last)
+// 10. Unknown routes, then the single error handler (must be registered last)
 app.use(notFound);
 app.use(globalErrorHandler);
 

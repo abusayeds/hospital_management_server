@@ -60,10 +60,45 @@ const envSchema = z.object({
   ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(30).default(7),
   BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(15).default(12),
-  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20), // login attempts / 15 min / IP
-  REFRESH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(60),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5), // login attempts / 15 min / IP + email
+  REFRESH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5), // token refreshes / 15 min / session
+  CHANGE_PASSWORD_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5), // per 15 min per user
+  // Per signed-in user, per hour: state-changing requests (POST/PUT/PATCH/DELETE) and reads.
+  // Reads are higher because dashboards poll (the live queue refreshes every 10 s).
+  USER_WRITE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(100),
+  USER_READ_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(3000),
+  // Assistant: patient messages answered by the AI per conversation (one WhatsApp number / web session) per hour
+  CHAT_HOURLY_LIMIT: z.coerce.number().int().positive().default(10),
+  // IP circuit breaker: more requests than this in an hour from one IP blocks that IP for IP_BLOCK_MINUTES
+  IP_BLOCK_THRESHOLD_PER_HOUR: z.coerce.number().int().positive().default(1000),
+  // Failed sign-ins from one IP in an hour before it is blocked and admins are alerted
+  FAILED_LOGIN_BLOCK_THRESHOLD: z.coerce.number().int().positive().default(100),
+  IP_BLOCK_MINUTES: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 60)
+    .default(60),
+  // Never blocked by the breaker (e.g. the hospital's own public IP). Loopback is always exempt.
+  IP_ALLOWLIST: z
+    .string()
+    .default("")
+    .transform((v) =>
+      v
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
   // A rotated refresh token re-used within this window is treated as a two-tab race, not theft
   REFRESH_REUSE_GRACE_SECONDS: z.coerce.number().int().min(0).max(60).default(10),
+  // HTTPS. Production needs EITHER a certificate for this process (TLS_CERT_PATH + TLS_KEY_PATH)
+  // OR TLS_TERMINATED_BY_PROXY=true when Nginx / a load balancer serves HTTPS in front of it.
+  TLS_CERT_PATH: optionalString,
+  TLS_KEY_PATH: optionalString,
+  TLS_TERMINATED_BY_PROXY: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
   // Which proxies may set X-Forwarded-For (Next.js dev server on this machine by default)
   TRUST_PROXY: z.string().default("loopback"),
   // Password for the seeded demo accounts (npm run seed). Never used in production.
@@ -136,8 +171,24 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+// Production refuses to start with development-grade settings
+const productionSchema = envSchema.superRefine((e, ctx) => {
+  if (e.NODE_ENV !== "production") return;
+  const issue = (path: string, message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+  if (!e.TLS_TERMINATED_BY_PROXY && !(e.TLS_CERT_PATH && e.TLS_KEY_PATH))
+    issue(
+      "TLS_CERT_PATH",
+      "production needs TLS_CERT_PATH and TLS_KEY_PATH, or TLS_TERMINATED_BY_PROXY=true behind an HTTPS proxy",
+    );
+  if (e.AI_PROVIDER !== "none" && !(e.AI_API_KEY || e.GEMINI_API_KEY))
+    issue("AI_API_KEY", "is required in production (or set AI_PROVIDER=none to switch AI features off on purpose)");
+  for (const origin of e.CLIENT_URL)
+    if (!origin.startsWith("https://")) issue("CLIENT_URL", `must use https:// in production (${origin})`);
+  if (e.DEMO_PASSWORD) issue("DEMO_PASSWORD", "must not be set in production");
+});
+
 const loadEnv = (): Env => {
-  const parsed = envSchema.safeParse(process.env);
+  const parsed = productionSchema.safeParse(process.env);
   if (parsed.success) return parsed.data;
 
   // Logger is not ready yet (it depends on env), so print directly.

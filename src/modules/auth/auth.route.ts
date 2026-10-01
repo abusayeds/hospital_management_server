@@ -1,6 +1,6 @@
 import express from "express";
 import { authenticate } from "../../middlewares/authenticate";
-import { loginLimiter, refreshLimiter } from "../../middlewares/rateLimiter";
+import { changePasswordLimiter, loginLimiter, refreshLimiter } from "../../middlewares/rateLimiter";
 import validateRequest from "../../middlewares/validateRequest";
 import { authController } from "./auth.controller";
 import { changePasswordSchema, loginSchema } from "./auth.validation";
@@ -15,6 +15,12 @@ router.post("/refresh", refreshLimiter, authController.refresh);
 router.post("/logout", authController.logout);
 router.post("/logout-all", pendingOk, authController.logoutAll);
 router.get("/me", pendingOk, authController.me);
-router.post("/change-password", pendingOk, validateRequest(changePasswordSchema), authController.changePassword);
+router.post(
+  "/change-password",
+  changePasswordLimiter,
+  pendingOk,
+  validateRequest(changePasswordSchema),
+  authController.changePassword,
+);
 
 export const AuthRoutes = router;
