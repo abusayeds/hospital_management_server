@@ -108,6 +108,10 @@ export const toAppointmentView = (a: any) => ({
   cancelReason: a.cancelReason,
   rescheduledFrom: a.rescheduledFrom ? String(a.rescheduledFrom) : null,
   rescheduledTo: a.rescheduledTo ? String(a.rescheduledTo) : null,
+  confirmedByPatient: Boolean(a.confirmedByPatient),
+  confirmedAt: a.confirmedAt ?? null,
+  lastReminderSentAt: a.lastReminderSentAt ?? null,
+  doctorAbsent: Boolean(a.doctorAbsent),
   statusHistory: (a.statusHistory ?? []).map((h: any) => ({ status: h.status, at: h.at, note: h.note })),
   patient: a.patient?._id
     ? {

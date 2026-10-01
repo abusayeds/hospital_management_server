@@ -3,13 +3,10 @@ import { Request } from "express";
 import { Types } from "mongoose";
 import AppError from "../../errors/AppError";
 import { buildPagination } from "../../interface/global.interface";
-import { emitToPermission } from "../../sockets";
 import { ageOn, todayInDhaka } from "../../utils/date";
 import { escapeRegex } from "../../utils/escapeRegex";
-import { logger } from "../../utils/logger";
 import { recordAudit } from "../audit/audit.service";
 import { AppointmentModel } from "../hospital/appointment/appointment.model";
-import { getSettings } from "../hospital/settings/settings.service";
 import { PatientModel } from "../patients/patient.model";
 import type { OutboundMessage } from "./assistant.types";
 import { adapterFor } from "./channels";
@@ -246,7 +243,7 @@ export const staffReply = async (req: Request, id: string, text: string) => {
   if (c.channel === "whatsapp" && !(c.lastInboundAt && Date.now() - c.lastInboundAt.getTime() < 24 * 3600 * 1000))
     throw new AppError(
       409,
-      "The patient's last WhatsApp message is older than 24 hours — WhatsApp only allows template messages now (Phase 6).",
+      "The patient's last WhatsApp message is older than 24 hours — WhatsApp only allows approved template messages now.",
       "CONFLICT",
     );
   if (c.status !== "human_active") {
@@ -307,34 +304,4 @@ export const addNote = async (req: Request, id: string, text: string) => {
   await c.save();
   await audit(req, c, "note");
   return c.notes.map((n: any) => ({ id: String(n._id), text: n.text, byName: n.byName, at: n.at }));
-};
-
-/**
- * AUTO-RETURN REMINDER: a taken-over chat where the patient wrote and no staff answered within the
- * configured minutes is announced again (once per waiting message), so nobody is left waiting.
- */
-export const remindIdleTakeovers = async () => {
-  const { assistantTakeoverReminderMinutes } = await getSettings();
-  const cutoff = new Date(Date.now() - (assistantTakeoverReminderMinutes ?? 5) * 60_000);
-  const waiting = (await ConversationModel.find({
-    status: "human_active",
-    lastInboundAt: { $lte: cutoff },
-    $expr: {
-      $and: [
-        { $gt: ["$lastInboundAt", { $ifNull: ["$lastStaffReplyAt", "$takenOverAt"] }] },
-        { $gt: ["$lastInboundAt", { $ifNull: ["$remindedAt", new Date(0)] }] },
-      ],
-    },
-  })) as ConversationDocument[];
-  for (const c of waiting) {
-    await ConversationModel.updateOne({ _id: c._id }, { $set: { remindedAt: new Date() } });
-    emitToPermission("inbox:manage", "inbox:alert", {
-      conversationId: String(c._id),
-      emergency: c.emergency,
-      reminder: true,
-      channel: c.channel,
-    });
-  }
-  if (waiting.length) logger.info({ count: waiting.length }, "Inbox: reminded staff about waiting patients");
-  return waiting.length;
 };

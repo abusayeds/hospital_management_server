@@ -51,6 +51,12 @@ export interface IAppointment extends IBaseFields {
   rescheduledFrom?: Types.ObjectId | null;
   rescheduledTo?: Types.ObjectId | null;
   chatSessionId?: string | null;
+  // Automation (Phase 6)
+  confirmedByPatient: boolean; // the patient tapped "Confirm" on a confirmation / reminder
+  confirmedAt?: Date | null;
+  lastReminderSentAt?: Date | null;
+  doctorAbsent: boolean; // the doctor took leave after this booking → reception sees it highlighted
+  doctorAbsentNotifiedAt?: Date | null;
 }
 
 export type AppointmentDocument = HydratedDocument<IAppointment, IBaseMethods>;
@@ -90,6 +96,11 @@ const AppointmentSchema = new Schema<IAppointment>({
   rescheduledFrom: { type: Schema.Types.ObjectId, ref: "Appointment", default: null },
   rescheduledTo: { type: Schema.Types.ObjectId, ref: "Appointment", default: null },
   chatSessionId: { type: String, default: null },
+  confirmedByPatient: { type: Boolean, default: false },
+  confirmedAt: { type: Date, default: null },
+  lastReminderSentAt: { type: Date, default: null },
+  doctorAbsent: { type: Boolean, default: false },
+  doctorAbsentNotifiedAt: { type: Date, default: null },
 });
 
 // ---- Double booking is impossible at the DATABASE level ----

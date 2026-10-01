@@ -33,6 +33,7 @@ export type PlannedJob = {
   patientId?: string | null;
   urgent?: boolean;
   data?: Record<string, unknown>;
+  supersedes?: string; // rescheduled: the OLD appointment id whose open jobs this one replaces
 };
 
 export type RuleContext<C> = { now: Date; config: C & BaseRuleConfig; settings: HospitalSettings };
@@ -49,7 +50,7 @@ export type Prepared =
       variables: Record<string, unknown>;
       buttonRef?: string; // id the reply buttons carry (e.g. the appointment id)
       templateKey?: string; // overrides the rule's template (e.g. walk-in welcome)
-      related: { type: "appointment" | "visit" | "lab_order" | "conversation" | "doctor"; id: string };
+      related: { type: "appointment" | "visit" | "lab_order" | "conversation" | "doctor" | "patient"; id: string };
     }
   | {
       ok: true;

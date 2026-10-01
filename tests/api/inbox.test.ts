@@ -4,7 +4,11 @@ import { setWhatsAppTransport } from "../../src/modules/assistant/channels/whats
 import { ChatMessageModel } from "../../src/modules/assistant/chatMessage.model";
 import { ConversationModel } from "../../src/modules/assistant/conversation.model";
 import { handleInbound } from "../../src/modules/assistant/engine";
-import { remindIdleTakeovers } from "../../src/modules/assistant/inbox.service";
+import { dispatchDue } from "../../src/modules/automation/dispatcher";
+import { runPlanner } from "../../src/modules/automation/engine";
+import { OutboxMessageModel } from "../../src/modules/automation/models/outbox.model";
+import { getRule } from "../../src/modules/automation/rules/registry";
+import { ensureDefaultTemplates } from "../../src/modules/automation/templates/template.service";
 import { clearSettingsCache } from "../../src/modules/hospital/settings/settings.service";
 import { scriptedProvider } from "../assistant-fakes";
 import { createUser, signIn, useTestDatabase } from "../helpers";
@@ -103,7 +107,8 @@ describe("Staff inbox", () => {
     expect(res.body.error.message).toContain("24 hours");
   });
 
-  it("reminds staff once when a patient waits in a taken-over chat", async () => {
+  it("reminds staff once when a patient waits in a taken-over chat (automation rule 8)", async () => {
+    await ensureDefaultTemplates();
     const conv = await ConversationModel.create({
       channel: "web",
       channelUserId: WEB,
@@ -111,8 +116,13 @@ describe("Staff inbox", () => {
       takenOverAt: new Date(Date.now() - 20 * 60_000),
       lastInboundAt: new Date(Date.now() - 10 * 60_000),
     });
-    expect(await remindIdleTakeovers()).toBe(1);
-    expect(await remindIdleTakeovers()).toBe(0);
+    const rule = getRule("chat_no_reply")!;
+    expect((await runPlanner(rule)).created).toBe(1);
+    expect((await runPlanner(rule)).created).toBe(0); // once per waiting message
+    expect(await dispatchDue()).toMatchObject({ sent: 1 });
+    const alert = await OutboxMessageModel.findOne({ ruleKey: "chat_no_reply" });
+    expect(alert).toMatchObject({ channel: "inapp", toRef: "perm:inbox:manage" });
+    expect((await ConversationModel.findById(conv._id))!.remindedAt).toBeTruthy();
     await ChatMessageModel.deleteMany({ conversation: conv._id });
   });
 

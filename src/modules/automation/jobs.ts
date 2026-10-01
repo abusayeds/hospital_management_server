@@ -54,6 +54,8 @@ export const planJobs = async (ruleKey: string, planned: PlannedJob[]): Promise<
       if ((err as { code?: number }).code !== 11000) throw err;
     }
   }
+  // Only now does the replacement exist, so the old jobs can link to it
+  for (const p of planned) if (p.supersedes) await supersedeJobs(ruleKey, p.supersedes, p.scopeId);
   return counts;
 };
 
@@ -80,32 +82,26 @@ export const cancelOpenJobs = async (
 };
 
 /**
- * Rescheduled appointment: every open job of the old appointment becomes "superseded", linked to the new
- * appointment's job of the same rule (if one was planned), so the admin sees the chain.
+ * Rescheduled appointment: this rule's open jobs of the old appointment become "superseded", linked to the
+ * new appointment's job of the same rule (if one was planned), so the admin sees the chain.
  */
-export const supersedeJobs = async (fromScopeId: string, toScopeId: string) => {
-  const old = await AutomationJobModel.find({
-    scopeType: "appointment",
-    scopeId: fromScopeId,
-    status: { $in: OPEN_JOB_STATUSES },
-  }).lean<any[]>();
-  for (const job of old) {
-    const replacement = await AutomationJobModel.findOne({
-      ruleKey: job.ruleKey,
-      scopeType: "appointment",
-      scopeId: toScopeId,
-    })
-      .select("_id")
-      .lean<any>();
-    await AutomationJobModel.updateOne(
-      { _id: job._id, status: { $in: OPEN_JOB_STATUSES } },
-      {
-        $set: { status: "superseded", supersededBy: replacement?._id ?? null, cancelReason: "Appointment rescheduled" },
-        $push: { decisions: decision("cancelled", "superseded", `Rescheduled to appointment ${toScopeId}`) },
+export const supersedeJobs = async (ruleKey: string, fromScopeId: string, toScopeId: string) => {
+  const replacement = await AutomationJobModel.findOne({ ruleKey, scopeType: "appointment", scopeId: toScopeId })
+    .select("_id")
+    .lean<any>();
+  const res = await AutomationJobModel.updateMany(
+    { ruleKey, scopeType: "appointment", scopeId: fromScopeId, status: { $in: OPEN_JOB_STATUSES } },
+    {
+      $set: {
+        status: "superseded",
+        supersededBy: replacement?._id ?? null,
+        cancelReason: "Appointment rescheduled",
+        lease: null,
       },
-    );
-  }
-  return old.length;
+      $push: { decisions: decision("cancelled", "superseded", `Rescheduled to appointment ${toScopeId}`) },
+    },
+  );
+  return res.modifiedCount;
 };
 
 export const pushDecision = decision;
