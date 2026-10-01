@@ -21,22 +21,26 @@ export interface IAutomationRun {
   dryRun: boolean;
 }
 
-const RunSchema = new Schema<IAutomationRun>({
-  ruleKey: { type: String, required: true },
-  kind: { type: String, enum: ["planner", "event", "dispatch", "preview"], required: true },
-  trigger: { type: String, default: null },
-  startedAt: { type: Date, required: true },
-  finishedAt: { type: Date, default: null },
-  scanned: { type: Number, default: 0 },
-  created: { type: Number, default: 0 },
-  cancelled: { type: Number, default: 0 },
-  sent: { type: Number, default: 0 },
-  deferred: { type: Number, default: 0 },
-  skipped: { type: Number, default: 0 },
-  failed: { type: Number, default: 0 },
-  errors: { type: [String], default: [] },
-  dryRun: { type: Boolean, default: false },
-});
+// "errors" is a reserved Mongoose path name; it is only ever a plain string list here
+const RunSchema = new Schema<IAutomationRun>(
+  {
+    ruleKey: { type: String, required: true },
+    kind: { type: String, enum: ["planner", "event", "dispatch", "preview"], required: true },
+    trigger: { type: String, default: null },
+    startedAt: { type: Date, required: true },
+    finishedAt: { type: Date, default: null },
+    scanned: { type: Number, default: 0 },
+    created: { type: Number, default: 0 },
+    cancelled: { type: Number, default: 0 },
+    sent: { type: Number, default: 0 },
+    deferred: { type: Number, default: 0 },
+    skipped: { type: Number, default: 0 },
+    failed: { type: Number, default: 0 },
+    errors: { type: [String], default: [] },
+    dryRun: { type: Boolean, default: false },
+  },
+  { suppressReservedKeysWarning: true },
+);
 
 RunSchema.index({ ruleKey: 1, startedAt: -1 });
 RunSchema.index({ startedAt: 1 }, { expireAfterSeconds: 30 * 24 * 3600 });

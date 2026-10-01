@@ -85,8 +85,15 @@ export const renderTemplate = (
   const formatted: Record<string, string> = {};
   for (const v of tpl.variables) formatted[v.name] = formatValue(v, values[v.name], lang, numerals);
   const missing = tpl.variables.filter((v) => v.required && !formatted[v.name]).map((v) => v.name);
+  // A line whose placeholders are all OPTIONAL and empty is left out (no dangling "Directions:")
   const text = tpl.bodies[lang]
-    .replace(TAG, (_, name: string) => (byName.has(name.trim()) ? formatted[name.trim()] : ""))
+    .split("\n")
+    .filter((line) => {
+      const names = placeholders(line);
+      return !names.length || names.some((n) => formatted[n] || byName.get(n)?.required);
+    })
+    .map((line) => line.replace(TAG, (_, name: string) => (byName.has(name.trim()) ? formatted[name.trim()] : "")))
+    .join("\n")
     .replace(/[ \t]+\n/g, "\n")
     .trim();
   return {

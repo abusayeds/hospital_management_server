@@ -52,6 +52,13 @@ const WORDS: Record<string, RegExp> = {
 const text = (t: string): OutboundMessage => ({ type: "text", text: t });
 const lang = (conv: ConversationDocument): "bn" | "en" => (conv.language === "en" ? "en" : "bn");
 
+/** "STOP" / "START" are English words: answer in the patient's preferred language instead */
+const preferredLang = async (conv: ConversationDocument) => {
+  if (!conv.verifiedPhone) return lang(conv);
+  const p = await PatientModel.findOne({ phone: conv.verifiedPhone }).select("preferences.language").lean<any>();
+  return p?.preferences?.language === "en" ? "en" : p ? "bn" : lang(conv);
+};
+
 /** The most recent automated message with buttons sent to this phone in the last 48 hours */
 const recentAutomated = (phone: string) =>
   OutboxMessageModel.findOne({
@@ -279,14 +286,14 @@ registerInteraction(async (conv, replyId, typed) => {
   // STOP / START work any time, typed in any case
   if (!replyId && typed && STOP.test(typed)) {
     if (conv.verifiedPhone) await setOptOut(conv.verifiedPhone, true, `Replied STOP on ${conv.channel}`);
-    return { messages: [text(await optOutReply(lang(conv)))] };
+    return { messages: [text(await optOutReply(await preferredLang(conv)))] };
   }
   if (!replyId && typed && START.test(typed)) {
     if (conv.verifiedPhone) await setOptOut(conv.verifiedPhone, false, `Replied START on ${conv.channel}`);
     return {
       messages: [
         text(
-          lang(conv) === "bn"
+          (await preferredLang(conv)) === "bn"
             ? "আবার চালু হয়েছে — রিমাইন্ডার ও জরুরি তথ্য পাবেন। ধন্যবাদ!"
             : "You're back on — you'll get reminders and updates again. Thank you!",
         ),

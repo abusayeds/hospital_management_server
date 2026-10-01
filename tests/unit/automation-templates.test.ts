@@ -50,6 +50,19 @@ describe("template engine", () => {
     expect(renderTemplate(t, "en", {}, "en").missing).toEqual(["name", "date", "time", "serial"]);
   });
 
+  it("leaves out a line whose optional values are all empty", () => {
+    const t = tpl("x", "Hi {{name}}\nDirections: {{link}}\nBye", {
+      variables: [
+        { name: "name", type: "string", required: true, sample: "" },
+        { name: "link", type: "url", required: false, sample: "" },
+      ],
+    });
+    expect(renderTemplate(t, "en", { name: "Rahim" }, "en").text).toBe("Hi Rahim\nBye");
+    expect(renderTemplate(t, "en", { name: "Rahim", link: "https://x.y" }, "en").text).toBe(
+      "Hi Rahim\nDirections: https://x.y\nBye",
+    );
+  });
+
   it("maps WhatsApp template parameters in order, formatted like the text", () => {
     const t = tpl("x", "x", { whatsappTemplateName: "tl_x", whatsappParams: ["serial", "date"] });
     expect(renderTemplate(t, "en", { serial: 3, date: "2026-10-02" }, "en").whatsappParams).toEqual([

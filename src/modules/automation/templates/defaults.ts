@@ -48,8 +48,8 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
       v("directions", "https://maps.app.goo.gl/testolife", "url", false),
     ],
     bodies: {
-      bn: "{{patientName}}, আপনার সিরিয়াল নিশ্চিত হয়েছে ✅\nডাক্তার: {{doctorName}}\nতারিখ: {{date}}, সময়: {{time}}\nসিরিয়াল: {{serial}} · রুম: {{room}}\nফি: {{fee}}\nঅনুগ্রহ করে ১৫ মিনিট আগে আসবেন। পথ: {{directions}}\n— {{hospital}}",
-      en: "{{patientName}}, your appointment is confirmed ✅\nDoctor: {{doctorName}}\nDate: {{date}}, time: {{time}}\nSerial: {{serial}} · Room: {{room}}\nFee: {{fee}}\nPlease arrive 15 minutes early. Directions: {{directions}}\n— {{hospital}}",
+      bn: "{{patientName}}, আপনার সিরিয়াল নিশ্চিত হয়েছে ✅\nডাক্তার: {{doctorName}}\nতারিখ: {{date}}, সময়: {{time}}\nসিরিয়াল: {{serial}} · রুম: {{room}}\nফি: {{fee}}\nঅনুগ্রহ করে ১৫ মিনিট আগে আসবেন।\nপথ: {{directions}}\n— {{hospital}}",
+      en: "{{patientName}}, your appointment is confirmed ✅\nDoctor: {{doctorName}}\nDate: {{date}}, time: {{time}}\nSerial: {{serial}} · Room: {{room}}\nFee: {{fee}}\nPlease arrive 15 minutes early.\nDirections: {{directions}}\n— {{hospital}}",
     },
     buttons: [
       btn("confirm", "নিশ্চিত করছি", "Confirm"),
@@ -106,8 +106,8 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
       v("directions", "https://maps.app.goo.gl/testolife", "url", false),
     ],
     bodies: {
-      bn: "{{patientName}}, আজ {{time}}-এ {{doctorName}}-এর সাথে আপনার অ্যাপয়েন্টমেন্ট (সিরিয়াল {{serial}}, রুম {{room}})। লাইভ সিরিয়াল: {{queueLink}}\nপথ: {{directions}}",
-      en: "{{patientName}}, your appointment with {{doctorName}} is today at {{time}} (serial {{serial}}, room {{room}}). Live queue: {{queueLink}}\nDirections: {{directions}}",
+      bn: "{{patientName}}, আজ {{time}}-এ {{doctorName}}-এর সাথে আপনার অ্যাপয়েন্টমেন্ট (সিরিয়াল {{serial}}, রুম {{room}})।\nলাইভ সিরিয়াল: {{queueLink}}\nপথ: {{directions}}",
+      en: "{{patientName}}, your appointment with {{doctorName}} is today at {{time}} (serial {{serial}}, room {{room}}).\nLive queue: {{queueLink}}\nDirections: {{directions}}",
     },
     buttons: [btn("queue", "সিরিয়াল কত দূর?", "Queue status"), btn("cancel", "আসতে পারব না", "Can't come")],
     ...wa("tl_reminder_same_day", ["patientName", "time", "doctorName", "serial"]),

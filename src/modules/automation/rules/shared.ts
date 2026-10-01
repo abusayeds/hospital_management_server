@@ -20,7 +20,9 @@ export const languageOf = (patient: any): Lang => (patient?.preferences?.languag
 
 export const doctorNameFor = (doctor: any, lang: Lang) => {
   const en = `${doctor?.title ?? "Dr."} ${doctor?.name ?? ""}`.trim();
-  return lang === "bn" && doctor?.nameBn ? doctor.nameBn : en;
+  if (lang !== "bn" || !doctor?.nameBn) return en;
+  // Bangla names are stored without the title: add "ডা." unless it is already there
+  return /^(ডা|ডাঃ|প্রফেসর|অধ্যাপক)/.test(doctor.nameBn) ? doctor.nameBn : `ডা. ${doctor.nameBn}`;
 };
 
 export const hospitalNameFor = (s: HospitalSettings, lang: Lang) => (lang === "bn" ? s.nameBn || s.name : s.name);
