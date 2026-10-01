@@ -7,6 +7,7 @@ import { DAY_NAMES_EN, isValidDateString, todayInDhaka, weekdayOf } from "../../
 import { escapeRegex } from "../../../utils/escapeRegex";
 import { formatTaka } from "../../../utils/money";
 import { serialize } from "../../../utils/serialize";
+import { publish } from "../../../events/bus";
 import { recordAudit } from "../../audit/audit.service";
 import { UserModel } from "../../users/user.model";
 import { DepartmentModel } from "../department/department.model";
@@ -160,9 +161,15 @@ export const updateDoctor = async (req: Request, id: string, input: DoctorInput)
   await assertValidInput(input);
   const doc = await findOrThrow(id);
   const before = snapshot(doc);
+  const leaveKey = (l: any) => `${l.from}|${l.to}`;
+  const oldLeaves = new Set((doc.leaves ?? []).map(leaveKey));
   doc.set({ ...input, updatedBy: req.user!.id });
   await doc.save();
   await recordAudit({ req, action: "UPDATE", entityType: "Doctor", entityId: doc._id, before, after: snapshot(doc) });
+  // New leave → automation tells the patients already booked on those days
+  for (const l of doc.leaves ?? [])
+    if (!oldLeaves.has(leaveKey(l)) && l.to >= todayInDhaka())
+      void publish("doctor.leave_added", { doctorId: String(doc._id), from: l.from, to: l.to });
   return getDoctor(id, { withAccount: true });
 };
 

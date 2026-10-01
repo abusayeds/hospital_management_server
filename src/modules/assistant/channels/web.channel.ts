@@ -1,4 +1,5 @@
 import { emitToRoom } from "../../../sockets";
+import { recordChatSend } from "../../automation/outbox/record";
 import type { ChatMessageDocument } from "../chatMessage.model";
 import type { ChannelAdapter } from "./types";
 
@@ -21,5 +22,9 @@ export const webAdapter: ChannelAdapter = {
   channel: "web",
   async deliver(conv, items) {
     for (const { doc } of items) emitToRoom(`webchat:${conv.channelUserId}`, "chat:message", toWebMessage(doc));
+    await recordChatSend(
+      conv,
+      items.map((i) => i.doc),
+    );
   },
 };

@@ -18,7 +18,7 @@ export interface IChatMessage {
   conversation: Types.ObjectId;
   channel: Channel;
   direction: "inbound" | "outbound";
-  sender: "patient" | "bot" | "staff" | "system";
+  sender: "patient" | "bot" | "staff" | "system" | "automation"; // automation = Phase 6 reminders etc.
   staffUser?: Types.ObjectId | null;
   text: string;
   rich?: OutboundMessage | null; // structured bot output (cards, lists, buttons)
@@ -41,7 +41,7 @@ const ChatMessageSchema = new Schema<IChatMessage>(
     conversation: { type: Schema.Types.ObjectId, ref: "Conversation", required: true },
     channel: { type: String, enum: CHANNELS, required: true },
     direction: { type: String, enum: ["inbound", "outbound"], required: true },
-    sender: { type: String, enum: ["patient", "bot", "staff", "system"], required: true },
+    sender: { type: String, enum: ["patient", "bot", "staff", "system", "automation"], required: true },
     staffUser: { type: Schema.Types.ObjectId, ref: "User", default: null },
     text: { type: String, default: "", maxlength: 4000 },
     rich: { type: Schema.Types.Mixed, default: null },

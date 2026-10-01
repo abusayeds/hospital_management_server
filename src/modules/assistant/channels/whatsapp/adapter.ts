@@ -11,6 +11,8 @@ import { registerAdapter } from "../index";
 import type { ChannelAdapter, Delivery } from "../types";
 import { isWhatsAppConfigured, markAsRead, toPayload, transportFor } from "./client";
 import { renderForWhatsApp } from "./render";
+import { applyDeliveryStatus, recordChatSend } from "../../../automation/outbox/record";
+import { sendRawWhatsApp } from "../../../automation/outbox/outbox.service";
 
 /**
  * WHATSAPP CHANNEL ADAPTER
@@ -29,20 +31,27 @@ export const withinServiceWindow = (conv: { lastInboundAt?: Date | null }) =>
 
 // ------------------------------------------------------------------ outbound
 
-const markFailed = (items: Delivery[], error: string) =>
-  Promise.all(
+const markFailed = async (conv: ConversationDocument, items: Delivery[], error: string) => {
+  await Promise.all(
     items.map(({ doc }) =>
       ChatMessageModel.updateOne({ _id: doc._id }, { $set: { deliveryStatus: "failed", deliveryError: error } }),
     ),
   );
+  await recordChatSend(
+    conv,
+    items.map(({ doc }) => ({ ...doc.toObject(), deliveryStatus: "failed", deliveryError: error })),
+  );
+};
 
 export const whatsappAdapter: ChannelAdapter = {
   channel: "whatsapp",
   async deliver(conv: ConversationDocument, items: Delivery[]) {
     if (!items.length) return;
-    if (!conv.simulated && !isWhatsAppConfigured()) return void (await markFailed(items, "WhatsApp is not configured"));
+    if (!conv.simulated && !isWhatsAppConfigured())
+      return void (await markFailed(conv, items, "WhatsApp is not configured"));
+    // Free-form replies need the 24-hour window; proactive messages use approved templates (automation outbox)
     if (!withinServiceWindow(conv))
-      return void (await markFailed(items, "Outside WhatsApp's 24-hour window (templates come in Phase 6)"));
+      return void (await markFailed(conv, items, "Outside WhatsApp's 24-hour window — only template messages allowed"));
 
     const transport = transportFor(conv.simulated);
     let numbered: { n: number; id: string; label: string }[] | null = null;
@@ -58,17 +67,14 @@ export const whatsappAdapter: ChannelAdapter = {
         if (r.ok) firstId ??= r.messageId;
         else error = r.error;
       }
-      await ChatMessageModel.updateOne(
-        { _id: doc._id },
-        {
-          $set: {
-            externalMessageId: firstId,
-            deliveryStatus: error ? "failed" : "sent",
-            deliveryError: error,
-            channelPayload: payloads,
-          },
-        },
-      );
+      const delivery = {
+        externalMessageId: firstId,
+        deliveryStatus: (error ? "failed" : "sent") as "failed" | "sent",
+        deliveryError: error,
+        channelPayload: payloads,
+      };
+      await ChatMessageModel.updateOne({ _id: doc._id }, { $set: delivery });
+      await recordChatSend(conv, [{ ...doc.toObject(), ...delivery }]);
     }
     if (numbered) await ConversationModel.updateOne({ _id: conv._id }, { $set: { lastOptions: numbered } });
   },
@@ -149,6 +155,7 @@ export const processWebhook = async (payload: WebhookPayload, opts: { simulated?
             },
           },
         );
+        await applyDeliveryStatus(s.id, s.status, s.errors?.[0]?.title ?? null);
       }
       const names = new Map<string, string>((value.contacts ?? []).map((c: any) => [c.wa_id, c.profile?.name]));
       for (const m of (value.messages ?? []) as WaMessage[]) {
@@ -189,20 +196,22 @@ export const drainWhatsApp = async () => {
 
 /**
  * Web-chat verification codes can go to WhatsApp when it is configured. Note: a number that has not
- * messaged the hospital in 24 hours needs an approved authentication TEMPLATE (Phase 6); a failed
- * send falls back to the next sender.
+ * messaged the hospital in 24 hours needs an approved authentication TEMPLATE; a failed send falls
+ * back to the next sender. Sent through the Outbox like everything else — with the code MASKED there.
  */
 registerOtpSender({
   name: "whatsapp",
   send: async (phone, code) => {
     if (!isWhatsAppConfigured()) return false;
-    const to = (toE164Bd(phone) ?? phone).replace(/^\+/, "");
-    const r = await transportFor(false).send(
-      toPayload(to, {
+    const r = await sendRawWhatsApp({
+      phone: toE164Bd(phone) ?? phone,
+      body: {
         type: "text",
         text: { body: `Testolife verification code: ${code}\nআপনার যাচাই কোড: ${code} (৫ মিনিট বৈধ)` },
-      }),
-    );
+      },
+      maskedText: "Verification code •••••• (masked)",
+      source: "system",
+    });
     return r.ok;
   },
 });

@@ -51,6 +51,8 @@ export type DomainEventMap = {
   };
   "lab.sample_collected": { labOrderId: Id; patientId: Id };
   "lab.report_ready": { labOrderId: Id; patientId: Id; doctorId: Id | null; visitId: Id | null };
+  // Schedules (Phase 6): a leave was added to a doctor's profile — booked patients must be told
+  "doctor.leave_added": { doctorId: Id; from: IsoDate; to: IsoDate };
   // Patient assistant (Phase 5)
   "chat.message_received": { conversationId: Id; channel: string };
   "chat.booking_created": { conversationId: Id; appointmentId: Id; patientId: Id; channel: string };
@@ -70,6 +72,7 @@ export const DOMAIN_EVENT_NAMES = [
   "lab.order_created",
   "lab.sample_collected",
   "lab.report_ready",
+  "doctor.leave_added",
   "chat.message_received",
   "chat.booking_created",
   "chat.handover_requested",

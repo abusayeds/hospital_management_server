@@ -10,6 +10,7 @@ import { WEB_CHAT_COOKIE, toWebMessage } from "./channels/web.channel";
 import { ChatMessageModel } from "./chatMessage.model";
 import { ConversationModel } from "./conversation.model";
 import { handleInbound } from "./engine";
+import { recordChatSend } from "../automation/outbox/record";
 import { MENU_OPTIONS } from "./interactions";
 
 /**
@@ -73,6 +74,8 @@ const send = catchAsync(async (req: Request, res: Response) => {
     replyId: req.body.replyId,
     timestamp: new Date(),
   });
+  // Bot replies travel in this HTTP response — and are recorded in the Outbox like every other send
+  if (!result.duplicate) await recordChatSend(result.conversation, result.stored);
   sendResponse(res, {
     statusCode: 200,
     success: true,

@@ -1,5 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 import { IBaseFields, basePlugin } from "../../../models/plugins/basePlugin";
+import { TIME_PATTERN } from "../../../utils/date";
 
 // Exactly one document (key "default"). Secrets never live here — they stay in .env.
 export interface IHospitalSettings extends IBaseFields {
@@ -24,6 +25,18 @@ export interface IHospitalSettings extends IBaseFields {
   assistantDailyAiBudget: number; // max AI calls per day for the assistant (cost guard)
   assistantEmergencyKeywords: string[]; // extra emergency words/phrases, added to the built-in list
   assistantTakeoverReminderMinutes: number; // remind staff when a taken-over chat waits this long
+  // Automation (Phase 6)
+  automationPaused: boolean; // global kill switch: planners and the dispatcher do nothing
+  quietHoursStart: string; // HH:mm Asia/Dhaka — no non-urgent patient messages from here …
+  quietHoursEnd: string; // … until here (the window may cross midnight)
+  messageNumerals: "bn" | "en"; // digits in Bangla messages: ১২৩ or 123
+  automationDailyBudget: number; // max automated patient messages per day, all rules together
+  perPhoneDailyCap: number; // max non-essential automated messages per phone per day
+  dedupeWindowMinutes: number; // identical text to the same phone inside this window is suppressed
+  simulateWhatsApp: boolean; // dry-run: messages go to the simulator, never to Meta
+  simulateSms: boolean; // dry-run for the SMS fallback
+  smsFallbackEnabled: boolean; // try SMS when WhatsApp cannot deliver
+  failureAlertThreshold: number; // alert admins when this many sends fail within an hour
 }
 
 const HospitalSettingsSchema = new Schema<IHospitalSettings>({
@@ -46,6 +59,17 @@ const HospitalSettingsSchema = new Schema<IHospitalSettings>({
   assistantDailyAiBudget: { type: Number, default: 3000, min: 0, max: 1_000_000 },
   assistantEmergencyKeywords: { type: [String], default: [] },
   assistantTakeoverReminderMinutes: { type: Number, default: 5, min: 1, max: 120 },
+  automationPaused: { type: Boolean, default: false },
+  quietHoursStart: { type: String, default: "21:00", match: TIME_PATTERN },
+  quietHoursEnd: { type: String, default: "09:00", match: TIME_PATTERN },
+  messageNumerals: { type: String, enum: ["bn", "en"], default: "bn" },
+  automationDailyBudget: { type: Number, default: 500, min: 0, max: 100_000 },
+  perPhoneDailyCap: { type: Number, default: 3, min: 1, max: 20 },
+  dedupeWindowMinutes: { type: Number, default: 30, min: 0, max: 24 * 60 },
+  simulateWhatsApp: { type: Boolean, default: true },
+  simulateSms: { type: Boolean, default: true },
+  smsFallbackEnabled: { type: Boolean, default: true },
+  failureAlertThreshold: { type: Number, default: 5, min: 1, max: 1000 },
 });
 HospitalSettingsSchema.plugin(basePlugin);
 

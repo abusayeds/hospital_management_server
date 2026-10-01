@@ -23,6 +23,7 @@ import { LabRoutes } from "../modules/clinical/lab/lab.route";
 import { AiSummaryRoutes } from "../modules/clinical/ai-summary/aiSummary.route";
 import { VerifyRoutes } from "../documents/verify.route";
 import { HealthRoutes } from "./health.route";
+import "../modules/automation"; // registers automation rules on the event bus
 
 // Mounted at /api/v1 in app.ts. A future /api/v2 can live beside it.
 const router = express.Router();

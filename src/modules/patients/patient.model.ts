@@ -5,6 +5,22 @@ export const GENDERS = ["male", "female", "other"] as const;
 export const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const;
 export const REGISTRATION_SOURCES = ["reception", "chatbot", "whatsapp", "phone"] as const;
 
+/**
+ * What automated messages the patient wants (Phase 6). Categories can be switched off one by one;
+ * optOutAll ("STOP") silences everything except essential operational messages (emergencies, the
+ * hospital cancelling their booking). Marketing is opt-IN and never sent after STOP.
+ */
+export type PatientPreferences = {
+  reminders: boolean;
+  followUps: boolean;
+  labReports: boolean;
+  marketing: boolean;
+  language: "bn" | "en";
+  optOutAll: boolean;
+  optOutAt?: Date | null;
+  optOutReason?: string | null;
+};
+
 export interface IPatient extends IBaseFields {
   patientCode: string; // "TL-000123" from an atomic counter
   name: string;
@@ -26,6 +42,7 @@ export interface IPatient extends IBaseFields {
   registeredBy?: Types.ObjectId | null;
   registrationSource: (typeof REGISTRATION_SOURCES)[number];
   lastVisitDate?: string | null; // YYYY-MM-DD of the last completed appointment
+  preferences: PatientPreferences;
 }
 
 export type PatientDocument = HydratedDocument<IPatient, IBaseMethods>;
@@ -59,6 +76,16 @@ const PatientSchema = new Schema<IPatient>({
   registeredBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
   registrationSource: { type: String, enum: REGISTRATION_SOURCES, default: "reception" },
   lastVisitDate: { type: String, default: null },
+  preferences: {
+    reminders: { type: Boolean, default: true },
+    followUps: { type: Boolean, default: true },
+    labReports: { type: Boolean, default: true },
+    marketing: { type: Boolean, default: false },
+    language: { type: String, enum: ["bn", "en"], default: "bn" },
+    optOutAll: { type: Boolean, default: false },
+    optOutAt: { type: Date, default: null },
+    optOutReason: { type: String, default: null, maxlength: 200 },
+  },
 });
 
 // Reception searches by phone far more than anything else ("what's your number?")

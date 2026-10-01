@@ -1,5 +1,5 @@
 import { Request } from "express";
-import { env } from "../../../config/env";
+import { env, isProduction } from "../../../config/env";
 import { serialize } from "../../../utils/serialize";
 import { recordAudit } from "../../audit/audit.service";
 import { HospitalSettingsModel, IHospitalSettings } from "./settings.model";
@@ -28,6 +28,18 @@ const defaults = (): HospitalSettings => ({
   assistantDailyAiBudget: 3000,
   assistantEmergencyKeywords: [],
   assistantTakeoverReminderMinutes: 5,
+  automationPaused: false,
+  quietHoursStart: "21:00",
+  quietHoursEnd: "09:00",
+  messageNumerals: "bn",
+  automationDailyBudget: 500,
+  perPhoneDailyCap: 3,
+  dedupeWindowMinutes: 30,
+  // Simulation is ON outside production so a demo never messages real phones by accident
+  simulateWhatsApp: !isProduction,
+  simulateSms: !isProduction,
+  smsFallbackEnabled: true,
+  failureAlertThreshold: 5,
 });
 
 // Settings are read on every booking; cache them in memory and drop the cache on update.

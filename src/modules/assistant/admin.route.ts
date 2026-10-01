@@ -12,7 +12,8 @@ import sendResponse from "../../utils/sendResponse";
 import { toE164Bd } from "../../utils/phone";
 import { recordAudit } from "../audit/audit.service";
 import { drainWhatsApp, processWebhook, whatsappInfo } from "./channels/whatsapp/adapter";
-import { isWhatsAppConfigured, toPayload, transportFor } from "./channels/whatsapp/client";
+import { isWhatsAppConfigured } from "./channels/whatsapp/client";
+import { sendRawWhatsApp } from "../automation/outbox/outbox.service";
 import { ChatMessageModel } from "./chatMessage.model";
 import { ConversationModel } from "./conversation.model";
 import { maskPhone } from "./otp.service";
@@ -62,12 +63,13 @@ router.post(
     if (!isWhatsAppConfigured()) throw new AppError(409, "WhatsApp is not configured on this server.", "CONFLICT");
     const phone = toE164Bd(req.body.to);
     if (!phone) throw new AppError(400, "Enter a Bangladeshi mobile number.", "VALIDATION_ERROR");
-    const r = await transportFor(false).send(
-      toPayload(phone.replace("+", ""), {
-        type: "text",
-        text: { body: "Testolife: test message from the admin panel ✅" },
-      }),
-    );
+    const r = await sendRawWhatsApp({
+      phone,
+      body: { type: "text", text: { body: "Testolife: test message from the admin panel ✅" } },
+      maskedText: "Testolife: test message from the admin panel ✅",
+      source: "test",
+      createdBy: req.user!.id,
+    });
     await recordAudit({ req, action: "UPDATE", entityType: "Channel", meta: { test: "whatsapp", ok: r.ok } });
     if (!r.ok) throw new AppError(502, `WhatsApp refused the message: ${r.error}`, "BAD_REQUEST");
     ok(res, "Test message sent", r);

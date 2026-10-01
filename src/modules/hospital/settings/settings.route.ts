@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authenticate } from "../../../middlewares/authenticate";
 import { requireAnyPermission, requirePermission } from "../../../middlewares/authorize";
 import validateRequest from "../../../middlewares/validateRequest";
+import { TIME_PATTERN } from "../../../utils/date";
 import catchAsync from "../../../utils/catchAsync";
 import sendResponse from "../../../utils/sendResponse";
 import { getPublicHospitalInfo, getSettings, updateSettings } from "./settings.service";
@@ -34,6 +35,21 @@ const updateSettingsSchema = z.object({
       assistantDailyAiBudget: z.number().int().min(0).max(1_000_000),
       assistantEmergencyKeywords: z.array(z.string().trim().min(2).max(60)).max(100),
       assistantTakeoverReminderMinutes: z.number().int().min(1).max(120),
+      automationPaused: z.boolean(),
+      quietHoursStart: z.string().regex(TIME_PATTERN, "Use HH:mm"),
+      quietHoursEnd: z.string().regex(TIME_PATTERN, "Use HH:mm"),
+      messageNumerals: z.enum(["bn", "en"]),
+      automationDailyBudget: z.number().int().min(0).max(100_000),
+      perPhoneDailyCap: z.number().int().min(1).max(20),
+      dedupeWindowMinutes: z
+        .number()
+        .int()
+        .min(0)
+        .max(24 * 60),
+      simulateWhatsApp: z.boolean(),
+      simulateSms: z.boolean(),
+      smsFallbackEnabled: z.boolean(),
+      failureAlertThreshold: z.number().int().min(1).max(1000),
     })
     .partial(),
 });

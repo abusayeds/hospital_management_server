@@ -76,7 +76,8 @@ export const PERMISSIONS = {
   "master_data:manage": "Departments, doctors, schedules, services and catalogs",
   "doctor:read": "See departments, doctors, schedules and free slots",
   "audit:read": "Read audit logs",
-  "automation:manage": "Reminder and follow-up rules",
+  "automation:read": "See automation rules, outbox, queue and run log",
+  "automation:manage": "Change automation rules, templates and settings; retry or cancel messages",
   // Patient portal (Phase 10) — always limited to the patient's OWN data
   "portal:own_records": "Own appointments, prescriptions and reports",
 } as const;
@@ -91,6 +92,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "settings:manage",
     "master_data:manage",
     "audit:read",
+    "automation:read",
     "automation:manage",
     "report:operations",
     "inbox:manage",
@@ -105,6 +107,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "queue:read",
     "bill:read",
     "doctor:read",
+    "automation:read",
   ],
   // Front desk: basic patient info only — no diagnosis or prescriptions.
   reception: [
