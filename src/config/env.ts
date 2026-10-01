@@ -172,7 +172,7 @@ const envSchema = z.object({
 export type Env = z.infer<typeof envSchema>;
 
 // Production refuses to start with development-grade settings
-const productionSchema = envSchema.superRefine((e, ctx) => {
+export const productionSchema = envSchema.superRefine((e, ctx) => {
   if (e.NODE_ENV !== "production") return;
   const issue = (path: string, message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
   if (!e.TLS_TERMINATED_BY_PROXY && !(e.TLS_CERT_PATH && e.TLS_KEY_PATH))

@@ -26,7 +26,7 @@ const userIdOf = (req: Request): string | null => {
 // Applied to every /api route: slows down scraping and brute force.
 export const generalLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
-  limit: env.RATE_LIMIT_MAX,
+  limit: () => env.RATE_LIMIT_MAX, // read per request: tests and hot config can change it
   standardHeaders: "draft-7",
   legacyHeaders: false,
   // Health checks, and Meta's signed webhook calls (many patients share Meta's few IP addresses)
@@ -39,7 +39,7 @@ export const generalLimiter = rateLimit({
 // and the IP auto-block (security.service) handles one IP spraying many emails.
 export const loginLimiter = rateLimit({
   windowMs: FIFTEEN_MIN,
-  limit: env.AUTH_RATE_LIMIT_MAX,
+  limit: () => env.AUTH_RATE_LIMIT_MAX, // read per request: tests and hot config can change it
   standardHeaders: "draft-7",
   legacyHeaders: false,
   keyGenerator: (req) =>
@@ -56,7 +56,7 @@ export const loginLimiter = rateLimit({
 // Refresh: per session (refresh cookie), falling back to the IP when there is no cookie
 export const refreshLimiter = rateLimit({
   windowMs: FIFTEEN_MIN,
-  limit: env.REFRESH_RATE_LIMIT_MAX,
+  limit: () => env.REFRESH_RATE_LIMIT_MAX, // read per request: tests and hot config can change it
   standardHeaders: "draft-7",
   legacyHeaders: false,
   keyGenerator: (req) => {
@@ -69,7 +69,7 @@ export const refreshLimiter = rateLimit({
 // Change password: per signed-in user
 export const changePasswordLimiter = rateLimit({
   windowMs: FIFTEEN_MIN,
-  limit: env.CHANGE_PASSWORD_RATE_LIMIT_MAX,
+  limit: () => env.CHANGE_PASSWORD_RATE_LIMIT_MAX, // read per request: tests and hot config can change it
   standardHeaders: "draft-7",
   legacyHeaders: false,
   keyGenerator: (req) => (userIdOf(req) ? `u:${userIdOf(req)}` : `ip:${ipKey(req)}`),
@@ -82,7 +82,7 @@ const isWrite = (req: Request) => !["GET", "HEAD", "OPTIONS"].includes(req.metho
 // Writes and reads are counted separately (dashboards poll, so reads get a higher budget).
 export const userWriteLimiter = rateLimit({
   windowMs: HOUR,
-  limit: env.USER_WRITE_LIMIT_PER_HOUR,
+  limit: () => env.USER_WRITE_LIMIT_PER_HOUR, // read per request: tests and hot config can change it
   standardHeaders: "draft-7",
   legacyHeaders: false,
   skip: (req) => !isWrite(req) || !userIdOf(req) || req.originalUrl.startsWith("/api/v1/auth/"),
@@ -91,7 +91,7 @@ export const userWriteLimiter = rateLimit({
 });
 export const userReadLimiter = rateLimit({
   windowMs: HOUR,
-  limit: env.USER_READ_LIMIT_PER_HOUR,
+  limit: () => env.USER_READ_LIMIT_PER_HOUR, // read per request: tests and hot config can change it
   standardHeaders: "draft-7",
   legacyHeaders: false,
   skip: (req) => isWrite(req) || !userIdOf(req),
