@@ -13,7 +13,6 @@
     "start": "node dist/server.js",
     "seed": "tsx scripts/seed.ts",
     "seed:reset": "tsx scripts/reset-hospital-data.ts",
-    "demo:live": "tsx scripts/demo-live-queue.ts",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "typecheck": "tsc -p tsconfig.check.json",
     "lint": "eslint src scripts tests --ext .ts",
