@@ -67,8 +67,9 @@ const envSchema = z.object({
   // Reads are higher because dashboards poll (the live queue refreshes every 10 s).
   USER_WRITE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(100),
   USER_READ_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(3000),
-  // Assistant: patient messages answered by the AI per conversation (one WhatsApp number / web session) per hour
-  CHAT_HOURLY_LIMIT: z.coerce.number().int().positive().default(10),
+  // Assistant: patient messages answered by the AI per conversation (one WhatsApp number / web session)
+  // per hour. 0 = unlimited (the default); the per-IP web chat limiter still applies.
+  CHAT_HOURLY_LIMIT: z.coerce.number().int().min(0).default(0),
   // IP circuit breaker: more requests than this in an hour from one IP blocks that IP for IP_BLOCK_MINUTES
   IP_BLOCK_THRESHOLD_PER_HOUR: z.coerce.number().int().positive().default(1000),
   // Failed sign-ins from one IP in an hour before it is blocked and admins are alerted

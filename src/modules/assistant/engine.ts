@@ -329,7 +329,7 @@ export const handleInbound = async (inbound: InboundMessage): Promise<EngineResu
         toolLogs: [],
         flags: [],
       };
-    } else if ((await patientMessagesLastHour(conv)) > env.CHAT_HOURLY_LIMIT) {
+    } else if (env.CHAT_HOURLY_LIMIT > 0 && (await patientMessagesLastHour(conv)) > env.CHAT_HOURLY_LIMIT) {
       // Over the hourly limit: no AI answer, but every message gets the notice with the
       // "Talk to a person" button, so the patient can always reach staff. Staff see every message.
       outcome = {
