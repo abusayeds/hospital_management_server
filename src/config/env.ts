@@ -116,8 +116,6 @@ const envSchema = z.object({
   ENCRYPTION_KEY: z
     .string({ required_error: "is required" })
     .regex(/^[0-9a-fA-F]{64}$/, "must be 64 hex characters (32 random bytes)"),
-  // Read-only key for the waiting-room TV (/queue-display?key=...). Not a login: it only unlocks masked queue data.
-  QUEUE_DISPLAY_KEY: z.string({ required_error: "is required" }).min(16, "must be at least 16 characters"),
 
   // Printed documents (Phase 4): the QR on a prescription / lab report carries a signed code.
   // Optional: when empty a key is derived from JWT_SECRET_KEY. Changing it invalidates old QR codes.

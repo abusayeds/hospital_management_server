@@ -6,7 +6,6 @@ import { todayInDhaka, weekdayOf } from "../../src/utils/date";
 import { createClinic, createPatients } from "../fixtures";
 import { app, createUser, request, signIn, useTestDatabase } from "../helpers";
 
-const DISPLAY_KEY = "test-display-key-123"; // tests/setup/test-env.ts
 
 describe("queue ordering (pure)", () => {
   it("in consultation first, then emergency > elderly > normal, then serial", () => {
@@ -116,14 +115,12 @@ describe("Queue API", () => {
     expect((await agent.post(`/api/v1/queue/${other._id}/call-next`)).status).toBe(403);
   });
 
-  it("the TV display needs the key and never returns phone numbers, full names or patient codes", async () => {
+  it("the public queue board needs no key and never returns phone numbers, full names or patient codes", async () => {
     const { patients } = await setup();
-    expect((await request(app).get("/api/v1/display/queue")).status).toBe(401);
-    expect((await request(app).get("/api/v1/display/queue?key=wrong")).status).toBe(401);
-
-    const res = await request(app).get(`/api/v1/display/queue?key=${DISPLAY_KEY}`);
+    const res = await request(app).get("/api/v1/display/queue");
     expect(res.status).toBe(200);
     const card = res.body.data.doctors[0];
+    expect(card.state).toBe("in_session");
     expect(card.nowServing).toEqual({ serialNo: 1, maskedName: maskName(patients[0].name) });
     expect(card.next.map((n: { serialNo: number }) => n.serialNo)).toEqual([3, 2]);
 

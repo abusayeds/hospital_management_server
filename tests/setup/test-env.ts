@@ -20,7 +20,6 @@ process.env.CHAT_HOURLY_LIMIT = "1000";
 process.env.DNS_SERVERS = "";
 process.env.DEMO_PASSWORD = "";
 process.env.ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-process.env.QUEUE_DISPLAY_KEY = "test-display-key-123";
 // Never call a real AI provider from tests (tests install fake providers where they need one)
 process.env.GEMINI_API_KEY = "";
 process.env.AI_API_KEY = "";

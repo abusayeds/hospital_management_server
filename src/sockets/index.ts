@@ -5,18 +5,22 @@ import { Permission, permissionsForRole } from "../config/permissions";
 import { ACCESS_COOKIE, readCookie, verifyAccessToken } from "../modules/auth/tokens";
 import { WEB_CHAT_COOKIE } from "../modules/assistant/channels/web.channel";
 import { DoctorModel } from "../modules/hospital/doctor/doctor.model";
-import { isValidDisplayKey } from "../modules/hospital/queue/display-key";
 import { IUser, UserModel } from "../modules/users/user.model";
 import { logger } from "../utils/logger";
 
 let io: SocketIOServer | null = null;
 
+// Open queue-board connections per IP (a hospital TV or a family's phones need only a few)
+const MAX_DISPLAY_PER_IP = 10;
+const displayPerIp = new Map<string, number>();
+
 /**
  * Real-time channel. Every connection lands in rooms that decide what it may hear:
  *  - signed-in staff (access-token cookie): one room per permission ("perm:queue:read"…)
  *    plus "user:<id>"; a doctor also joins "doctor:<doctorId>" for their own queue
- *  - the waiting-room TV (handshake auth.displayKey): the "display" room only —
- *    it receives data-free "something changed" signals and fetches masked data itself
+ *  - the public queue board (handshake auth.display = true, no login): the "display" room only —
+ *    it receives data-free "something changed" signals and fetches masked data itself.
+ *    Anyone may open it, so each IP address may hold only a few such connections
  *  - a web-chat visitor (anonymous "tl_chat" cookie): "webchat:<session>" only — staff replies
  *    to THEIR conversation arrive live
  *  - anyone else: no rooms, hears nothing
@@ -29,8 +33,13 @@ export const initSocketIO = (server: HttpServer): SocketIOServer => {
 
   io.use(async (socket, next) => {
     try {
-      if (isValidDisplayKey(socket.handshake.auth?.displayKey)) {
+      if (socket.handshake.auth?.display === true) {
+        const ip = socket.handshake.address;
+        const open = displayPerIp.get(ip) ?? 0;
+        if (open >= MAX_DISPLAY_PER_IP) return next(new Error("Too many queue display connections"));
+        displayPerIp.set(ip, open + 1);
         socket.data.display = true;
+        socket.data.displayIp = ip;
         return next();
       }
       const chatSession = readCookie(socket.handshake.headers.cookie, WEB_CHAT_COOKIE);
@@ -67,7 +76,14 @@ export const initSocketIO = (server: HttpServer): SocketIOServer => {
       { socketId: socket.id, authenticated: Boolean(socket.data.userId), display: Boolean(socket.data.display) },
       "Socket connected",
     );
-    socket.on("disconnect", (reason) => logger.debug({ socketId: socket.id, reason }, "Socket disconnected"));
+    socket.on("disconnect", (reason) => {
+      if (socket.data.display) {
+        const left = (displayPerIp.get(socket.data.displayIp) ?? 1) - 1;
+        if (left > 0) displayPerIp.set(socket.data.displayIp, left);
+        else displayPerIp.delete(socket.data.displayIp);
+      }
+      logger.debug({ socketId: socket.id, reason }, "Socket disconnected");
+    });
   });
 
   logger.info("Socket.IO ready");

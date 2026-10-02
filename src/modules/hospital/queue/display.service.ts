@@ -6,8 +6,6 @@ import { findLeave } from "../scheduling/slotEngine";
 import { getSettings } from "../settings/settings.service";
 import { compareQueue } from "./queue.service";
 
-export { assertDisplayKey, isValidDisplayKey } from "./display-key";
-
 /** "Rahim Hossain" → "R*** H***" — enough for a patient to recognise themselves, useless to anyone else */
 export const maskName = (name: string): string =>
   name
@@ -18,16 +16,38 @@ export const maskName = (name: string): string =>
     .map((w) => `${w[0]!.toUpperCase()}***`)
     .join(" ");
 
-// A doctor appears on the TV from 30 minutes before a session until 60 minutes after it
+// A doctor counts as "in session" from 30 minutes before a session until 60 minutes after it
 const SHOW_BEFORE = 30;
 const SHOW_AFTER = 60;
 
+// Where a doctor is today; the board lists doctors in this order
+const STATE_ORDER = { in_session: 0, later: 1, done: 2, on_leave: 3, off: 4 } as const;
+type DoctorState = keyof typeof STATE_ORDER;
+
+// The board is public (anyone can open it), so many viewers share one database read:
+// a result is reused for a few seconds and dropped as soon as any queue changes.
+const CACHE_MS = 5_000;
+let cached: { at: number; board: ReturnType<typeof buildDisplayBoard> } | null = null;
+
+export const forgetDisplayBoard = () => {
+  cached = null;
+};
+
+export const getDisplayBoard = () => {
+  if (cached && Date.now() - cached.at < CACHE_MS) return cached.board;
+  const board = buildDisplayBoard();
+  cached = { at: Date.now(), board };
+  board.catch(() => forgetDisplayBoard());
+  return board;
+};
+
 /**
- * Waiting-room TV data. PUBLIC screen, so it contains ONLY: doctor name, department,
- * room, current serial and the next three serials with masked names. Never a phone
- * number, a full name, a patient code or anything clinical.
+ * Public queue board (waiting-room TV and anyone's phone, no login). Lists EVERY active
+ * doctor with today's state. It contains ONLY: doctor name, department, room, session
+ * times, current serial and the next three serials with masked names. Never a phone
+ * number, a full name, a patient code, a leave reason or anything clinical.
  */
-export const getDisplayBoard = async () => {
+const buildDisplayBoard = async () => {
   const date = todayInDhaka();
   const now = nowMinutesInDhaka();
   const [settings, doctors, appts] = await Promise.all([
@@ -49,15 +69,17 @@ export const getDisplayBoard = async () => {
     .map((d: any) => {
       const line = (byDoctor.get(String(d._id)) ?? []).sort(compareQueue);
       const leave = findLeave(d.leaves ?? [], date);
-      const session = leave
-        ? undefined
-        : (d.sessions ?? []).find(
-            (s: any) =>
-              s.dayOfWeek === weekdayOf(date) &&
-              toMinutes(s.startTime) - SHOW_BEFORE <= now &&
-              now < toMinutes(s.endTime) + SHOW_AFTER,
-          );
-      if (!session && line.length === 0) return null; // not in session → not on the TV
+      const today = leave
+        ? []
+        : (d.sessions ?? [])
+            .filter((s: any) => s.dayOfWeek === weekdayOf(date))
+            .sort((a: any, b: any) => toMinutes(a.startTime) - toMinutes(b.startTime));
+      const session = today.find(
+        (s: any) => toMinutes(s.startTime) - SHOW_BEFORE <= now && now < toMinutes(s.endTime) + SHOW_AFTER,
+      );
+      const upcoming = today.find((s: any) => toMinutes(s.startTime) - SHOW_BEFORE > now);
+      const state: DoctorState =
+        session || line.length ? "in_session" : leave ? "on_leave" : upcoming ? "later" : today.length ? "done" : "off";
       const current = line.find((a) => a.status === "in_consultation");
       return {
         doctorId: String(d._id),
@@ -68,6 +90,10 @@ export const getDisplayBoard = async () => {
         roomNo: d.roomNo ?? "",
         session: session
           ? { ...sessionLabel(session.startTime), startTime: session.startTime, endTime: session.endTime }
+          : null,
+        state,
+        nextSession: upcoming
+          ? { ...sessionLabel(upcoming.startTime), startTime: upcoming.startTime, endTime: upcoming.endTime }
           : null,
         nowServing: current ? { serialNo: current.serialNo, maskedName: maskName(current.patient?.name ?? "") } : null,
         next: line
@@ -81,7 +107,7 @@ export const getDisplayBoard = async () => {
         waitingCount: line.filter((a) => a.status === "checked_in").length,
       };
     })
-    .filter(Boolean);
+    .sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state]); // stable: room order within each group
 
   return {
     date,

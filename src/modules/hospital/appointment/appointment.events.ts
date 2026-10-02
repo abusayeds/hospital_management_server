@@ -1,12 +1,13 @@
 import { publish } from "../../../events/bus";
 import { emitToPermission, emitToRoom } from "../../../sockets";
+import { forgetDisplayBoard } from "../queue/display.service";
 import type { AppointmentStatus } from "./appointment.model";
 import type { AppointmentView } from "./appointment.service";
 
 /**
  * Tell every open screen that an appointment changed, so reception, doctor and TV
  * screens refresh instantly without reloading. Payloads carry ids only; each screen
- * refetches what its user is allowed to see (the TV fetches masked data with its key).
+ * refetches what its user is allowed to see (the public board fetches masked data).
  *   appointment:updated → staff who can read appointments (lists, dashboards)
  *   queue:updated       → queue viewers, the doctor's own room and the TV display
  */
@@ -15,6 +16,7 @@ export const notifyAppointmentChanged = (a: Pick<AppointmentView, "id" | "date" 
   emitToPermission("appointment:read", "appointment:updated", signal);
   emitToPermission("queue:read", "queue:updated", { doctorId: a.doctor.id, date: a.date });
   emitToRoom(`doctor:${a.doctor.id}`, "queue:updated", { doctorId: a.doctor.id, date: a.date });
+  forgetDisplayBoard();
   emitToRoom("display", "queue:updated", { doctorId: a.doctor.id });
 };
 

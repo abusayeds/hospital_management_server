@@ -8,7 +8,7 @@ import validateRequest, { objectIdSchema } from "../../../middlewares/validateRe
 import catchAsync from "../../../utils/catchAsync";
 import sendResponse from "../../../utils/sendResponse";
 import { findDoctorForUser } from "../doctor/doctor.service";
-import { assertDisplayKey, getDisplayBoard } from "./display.service";
+import { getDisplayBoard } from "./display.service";
 import { queueService } from "./queue.service";
 
 // ---------------------------------------------------------------- object-level access
@@ -135,14 +135,11 @@ router.post(
 );
 export const QueueRoutes = router;
 
-// ---------------------------------------------------------------- routes (waiting-room TV, no login)
-const displaySchema = z.object({ query: z.object({ key: z.string().max(200).optional() }) });
+// ---------------------------------------------------------------- routes (public queue board, no login)
 export const DisplayRoutes = express.Router();
 DisplayRoutes.get(
   "/queue",
-  validateRequest(displaySchema),
-  catchAsync(async (req: Request, res: Response) => {
-    assertDisplayKey(req.query.key);
+  catchAsync(async (_req: Request, res: Response) => {
     res.setHeader("Cache-Control", "no-store");
     sendResponse(res, { statusCode: 200, success: true, message: "Display board", data: await getDisplayBoard() });
   }),
