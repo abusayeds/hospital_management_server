@@ -15,7 +15,7 @@ const defaults = (): HospitalSettings => ({
   nameBn: "টেস্টোলাইফ হাসপাতাল",
   address: env.HOSPITAL_ADDRESS,
   addressBn: "আরশিনগর, আমতলা, বসিলা ব্রিজের কাছে, কেরানীগঞ্জ, ঢাকা",
-  phones: [],
+  phones: ["01770075689", "01843425697"],
   emergencyPhone: env.HOSPITAL_EMERGENCY_PHONE,
   openingHours: env.HOSPITAL_OPD_HOURS,
   openingHoursBn: "শনিবার–বৃহস্পতিবার, সকাল ৯টা – রাত ৯টা",
