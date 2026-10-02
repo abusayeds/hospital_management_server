@@ -10,6 +10,7 @@ import { registerInteraction } from "../assistant/interactions";
 import { refFor } from "../assistant/refs";
 import { cancelAppointmentTool, getQueueStatus, rescheduleAppointmentTool } from "../assistant/tools/appointment.tools";
 import { getAvailableSlots } from "../assistant/tools/doctor.tools";
+import { ownsAppointment } from "../assistant/tools/shared";
 import type { ToolContext } from "../assistant/tools/types";
 import { LabOrderModel } from "../clinical/lab/labOrder.model";
 import { VisitModel } from "../clinical/visits/visit.model";
@@ -153,8 +154,8 @@ const ownedAppointmentById = async (conv: ConversationDocument, id: string) => {
     .populate("patient", "phone")
     .populate("doctor", "title name")
     .lean<any>();
-  if (!a || !conv.verifiedPhone || a.patient?.phone !== conv.verifiedPhone)
-    throw new AppError(403, "That appointment does not belong to this phone number.", "FORBIDDEN");
+  if (!a || !ownsAppointment(conv, a._id, a.patient?.phone))
+    throw new AppError(403, "That appointment does not belong to this chat.", "FORBIDDEN");
   return a;
 };
 

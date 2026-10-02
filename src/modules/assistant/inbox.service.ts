@@ -58,7 +58,7 @@ export const CANNED_REPLIES = [
 
 const displayName = (c: any) =>
   c.profileName ||
-  (c.verifiedPhone ? c.verifiedPhone.replace("+88", "") : null) ||
+  ((c.verifiedPhone ?? c.phone) ? String(c.verifiedPhone ?? c.phone).replace("+88", "") : null) ||
   (c.channel === "web" ? `Web visitor ${String(c.channelUserId).slice(0, 4).toUpperCase()}` : c.channelUserId);
 
 const listItem = (c: any) => ({

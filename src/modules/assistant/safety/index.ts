@@ -163,7 +163,9 @@ export const guardOutput = async (text: string, conv: ConversationDocument) => {
 
   const s = await getSettings();
   const digits = (p: string) => p.replace(/\D/g, "").slice(-10);
-  const allowedPhones = new Set([...(s.phones ?? []), s.emergencyPhone, conv.verifiedPhone ?? ""].map(digits));
+  const allowedPhones = new Set(
+    [...(s.phones ?? []), s.emergencyPhone, conv.verifiedPhone ?? conv.phone ?? ""].map(digits),
+  );
   let out = text.replace(PHONE, (m) => {
     if (allowedPhones.has(digits(m))) return m;
     flags.push("foreign_phone");

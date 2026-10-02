@@ -5,7 +5,7 @@ import type { ConversationDocument } from "../conversation.model";
 /**
  * TOOL CONTRACT. The model decides WHICH tool to call; the tool decides WHAT is allowed.
  *  - arguments are re-validated with Zod (never trusted);
- *  - personal tools require the conversation's verified phone and re-check ownership in code;
+ *  - personal tools need the chat's phone number and re-check ownership in code (tools/shared.ts);
  *  - `data` goes back to the model — keep it minimal (no phones, no real ids, no lab values);
  *  - `ui` is shown to the patient as rich messages (cards, lists, buttons), rendered by the channel.
  */
@@ -23,7 +23,8 @@ export type AssistantTool<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   description: string;
   parameters: Record<string, unknown>; // JSON Schema shown to the model
   schema: S;
-  needsVerification?: boolean;
+  needsPhone?: boolean; // the patient must have given a mobile number (set_phone)
+  needsVerifiedPhone?: boolean; // only on a proven number (WhatsApp), e.g. lab report status
   run: (args: z.infer<S>, ctx: ToolContext) => Promise<ToolOutput>;
 };
 

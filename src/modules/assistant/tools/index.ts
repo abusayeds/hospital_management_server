@@ -11,9 +11,10 @@ import {
   rescheduleAppointmentTool,
 } from "./appointment.tools";
 import { getAvailableSlots, getTestPreparation, searchDoctors } from "./doctor.tools";
-import { listMyPatients, registerPatientTool, startVerificationTool, verifyCodeTool } from "./identity.tools";
+import { listMyPatients, registerPatientTool, setPhoneTool } from "./identity.tools";
 import { getHospitalInfo, listDepartments, requestHuman } from "./info.tools";
 import { searchKnowledgeBase } from "./knowledge.tools";
+import { contactPhone } from "./shared";
 import type { AssistantTool, ToolContext } from "./types";
 
 /** Every tool the assistant may call. Order = how they are listed to the model. */
@@ -25,8 +26,7 @@ export const ASSISTANT_TOOLS: AssistantTool<any>[] = [
   searchDoctors,
   getAvailableSlots,
   getTestPreparation,
-  startVerificationTool,
-  verifyCodeTool,
+  setPhoneTool,
   listMyPatients,
   registerPatientTool,
   bookAppointmentTool,
@@ -39,7 +39,7 @@ export const ASSISTANT_TOOLS: AssistantTool<any>[] = [
 ];
 
 // Tools with side effects are not run from the admin's "test the assistant" panel
-const PREVIEW_BLOCKED = new Set(["request_human", "start_verification", "verify_code"]);
+const PREVIEW_BLOCKED = new Set(["request_human", "set_phone", "register_patient"]);
 
 const byName = new Map(ASSISTANT_TOOLS.map((t) => [t.name, t]));
 
@@ -89,14 +89,22 @@ export const runTool = async (call: AiToolCall, ctx: ToolContext): Promise<{ res
     );
   if (ctx.preview && PREVIEW_BLOCKED.has(tool.name))
     return finish({ error: "Not available in the test panel." }, false, "blocked in preview");
-  if (tool.needsVerification && !ctx.conversation.verifiedPhone)
+  if (tool.needsPhone && !contactPhone(ctx.conversation))
+    return finish(
+      { error: "no_phone", instruction: "Ask the patient for their mobile number and call set_phone first." },
+      false,
+      "phone required",
+    );
+  if (tool.needsVerifiedPhone && !ctx.conversation.verifiedPhone)
     return finish(
       {
-        error: "not_verified",
-        instruction: "Ask the patient for their mobile number and call start_verification first.",
+        error: "not_available_here",
+        instruction:
+          "Report status is shared only on WhatsApp or in the patient portal (sign in with the phone). " +
+          "Or the patient can call the hospital.",
       },
       false,
-      "verification required",
+      "verified phone required",
     );
 
   try {

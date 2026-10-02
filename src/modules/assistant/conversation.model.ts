@@ -32,6 +32,7 @@ export interface IConversation {
   verifiedPhone?: string | null;
   verifiedAt?: Date | null;
   linkedPatientIds: Types.ObjectId[];
+  chatAppointmentIds: Types.ObjectId[]; // booked in this chat (web chats may only see/change these)
   // Short references the model uses instead of real ids ("P1" → patient id, "A2" → appointment id)
   refs: Map<string, string>;
   language: "bn" | "en" | "mixed";
@@ -68,6 +69,7 @@ const ConversationSchema = new Schema<IConversation>(
     verifiedPhone: { type: String, default: null },
     verifiedAt: { type: Date, default: null },
     linkedPatientIds: { type: [Schema.Types.ObjectId], ref: "Patient", default: [] },
+    chatAppointmentIds: { type: [Schema.Types.ObjectId], ref: "Appointment", default: [] },
     refs: { type: Map, of: String, default: {} },
     language: { type: String, enum: ["bn", "en", "mixed"], default: "bn" },
     status: { type: String, enum: CONVERSATION_STATUSES, default: "bot_active" },

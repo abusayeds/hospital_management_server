@@ -19,7 +19,16 @@ import type { OutboundMessage } from "../assistant.types";
 import type { ConversationDocument, PendingAction } from "../conversation.model";
 import { registerInteraction } from "../interactions";
 import { refFor, resolveRef } from "../refs";
-import { dateLabel, firstName, ownedAppointment, ownedPatient, sourceOf, taka, time12 } from "./shared";
+import {
+  dateLabel,
+  firstName,
+  myAppointmentsFilter,
+  ownedAppointment,
+  ownedPatient,
+  sourceOf,
+  taka,
+  time12,
+} from "./shared";
 import { defineTool } from "./types";
 
 /**
@@ -93,7 +102,7 @@ export const bookAppointmentTool = defineTool({
     date: z.string().regex(DATE_PATTERN),
     slotTime: z.string().regex(TIME_PATTERN).optional(),
   }),
-  needsVerification: true,
+  needsPhone: true,
   run: async ({ patientRef, doctorId, date, slotTime }, ctx) => {
     const conv = ctx.conversation;
     const patient = await ownedPatient(conv, patientRef);
@@ -129,14 +138,14 @@ export const bookAppointmentTool = defineTool({
 
 export const getMyAppointments = defineTool({
   name: "get_my_appointments",
-  description: "Upcoming appointments of the patients on the verified phone (A-references).",
+  description: "Upcoming appointments this chat can see (A-references).",
   parameters: { type: "object", properties: {} },
   schema: z.object({}).passthrough(),
-  needsVerification: true,
+  needsPhone: true,
   run: async (_args, ctx) => {
     const conv = ctx.conversation;
     const rows = await AppointmentModel.find({
-      patient: { $in: conv.linkedPatientIds },
+      ...myAppointmentsFilter(conv),
       date: { $gte: todayInDhaka() },
       status: { $in: ACTIVE },
     })
@@ -187,7 +196,7 @@ export const cancelAppointmentTool = defineTool({
     required: ["appointmentRef"],
   },
   schema: z.object({ appointmentRef: z.string().trim().max(5) }),
-  needsVerification: true,
+  needsPhone: true,
   run: async ({ appointmentRef }, ctx) => {
     const appt = await ownedAppointment(ctx.conversation, appointmentRef);
     if (!["booked", "checked_in"].includes(appt.status))
@@ -244,7 +253,7 @@ export const rescheduleAppointmentTool = defineTool({
     newDate: z.string().regex(DATE_PATTERN),
     newSlotTime: z.string().regex(TIME_PATTERN).optional(),
   }),
-  needsVerification: true,
+  needsPhone: true,
   run: async ({ appointmentRef, newDate, newSlotTime }, ctx) => {
     const appt = await ownedAppointment(ctx.conversation, appointmentRef);
     if (!["booked", "checked_in"].includes(appt.status))
@@ -283,13 +292,13 @@ export const getQueueStatus = defineTool({
     "current serial, their serial, people ahead, estimated wait.",
   parameters: { type: "object", properties: { appointmentRef: { type: "string" } } },
   schema: z.object({ appointmentRef: z.string().trim().max(5).optional() }),
-  needsVerification: true,
+  needsPhone: true,
   run: async ({ appointmentRef }, ctx) => {
     const conv = ctx.conversation;
     const appt = appointmentRef
       ? await ownedAppointment(conv, appointmentRef)
       : await AppointmentModel.findOne({
-          patient: { $in: conv.linkedPatientIds },
+          ...myAppointmentsFilter(conv),
           date: todayInDhaka(),
           status: { $in: ACTIVE },
         }).sort({ slotTime: 1 });
@@ -371,7 +380,7 @@ export const getLabReportStatus = defineTool({
     "Optional L-reference for one report.",
   parameters: { type: "object", properties: { labOrderRef: { type: "string" } } },
   schema: z.object({ labOrderRef: z.string().trim().max(5).optional() }),
-  needsVerification: true,
+  needsVerifiedPhone: true, // lab tests are clinical: only on a proven number
   run: async ({ labOrderRef }, ctx) => {
     const conv = ctx.conversation;
     const oneId = labOrderRef ? resolveRef(conv, "L", labOrderRef) : null;
@@ -462,6 +471,7 @@ const execute = async (conv: ConversationDocument, pending: PendingAction): Prom
       },
       actor,
     );
+    conv.chatAppointmentIds.push(a.id as any);
     conv.metrics.bookingsCreated += 1;
     void publish("chat.booking_created", {
       conversationId: String(conv._id),

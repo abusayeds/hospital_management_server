@@ -18,7 +18,8 @@ const lastUserText = (req: AiChatRequest) => {
 };
 
 const firstPatientRef = (system: string) => /\b(P\d+)\s*\(/.exec(system)?.[1] ?? null;
-const verified = (system: string) => /Phone verified/.test(system);
+const hasPhone = (system: string) => /(WhatsApp number|Phone given) \(ends with/.test(system);
+const REGISTER = /(?:name|patient)\s*:?\s+([A-Za-z ]+?),\s*(male|female),\s*(\d{1,3})/i;
 
 const call = (name: string, args: Record<string, unknown> = {}): Partial<AiChatResponse> => ({
   toolCalls: [{ id: `${name}-${Math.random().toString(36).slice(2, 7)}`, name, args }],
@@ -66,8 +67,8 @@ const bestPassage = (query: string, passages: any[]) => {
 /** After a tool ran: a short answer built from its result (what a model would say) */
 const answerFromTool = (name: string, result: any, query = ""): Partial<AiChatResponse> => {
   const best = Array.isArray(result) ? bestPassage(query, result) : null;
-  if (result?.error === "not_verified")
-    return say("আপনার মোবাইল নম্বরটি দিন, যাচাই করে দেখাচ্ছি। · Please share your mobile number to verify.");
+  if (result?.error === "no_phone")
+    return say("আপনার মোবাইল নম্বরটি দিন। · Please share your mobile number.");
   if (result?.error) return say(`দুঃখিত: ${result.error}`);
   switch (name) {
     case "search_knowledge_base":
@@ -109,6 +110,10 @@ export const mockModel = (req: AiChatRequest): Partial<AiChatResponse> => {
           newDate: /\d{4}-\d{2}-\d{2}/.exec(intent)?.[0] ?? addDays(todayInDhaka(), 2),
         });
     }
+    // Number saved and the same message named the patient → register them next
+    const reg = REGISTER.exec(lastUserText(req));
+    if (r.name === "set_phone" && reg)
+      return call("register_patient", { name: reg[1].trim(), gender: reg[2].toLowerCase(), age: Number(reg[3]) });
     return answerFromTool(r.name, r.result, intent);
   }
 
@@ -117,7 +122,7 @@ export const mockModel = (req: AiChatRequest): Partial<AiChatResponse> => {
   const tap = /^Book doctorId (\w+) on (\S+) at (\S+)\./.exec(text);
   if (tap) {
     const ref = firstPatientRef(req.system);
-    if (!verified(req.system) || !ref)
+    if (!hasPhone(req.system) || !ref)
       return say("প্রথমে আপনার মোবাইল নম্বর দিন। · Please share your mobile number first.");
     return call("book_appointment", { patientRef: ref, doctorId: tap[1], date: tap[2], slotTime: tap[3] });
   }
@@ -125,7 +130,7 @@ export const mockModel = (req: AiChatRequest): Partial<AiChatResponse> => {
   if (chooseDoctor) return call("get_available_slots", { doctorId: chooseDoctor[1], date: addDays(todayInDhaka(), 1) });
 
   const phone = /(01[3-9]\d{8})/.exec(text.replace(/[\s-]/g, ""));
-  if (phone && !verified(req.system)) return call("start_verification", { phone: phone[1] });
+  if (phone && !hasPhone(req.system)) return call("set_phone", { phone: phone[1] });
 
   // Medicines / doses: refuse, suggest a doctor (checked before "medicine doctor")
   if (/(ওষুধ|osudh|oshudh|khabo|খাব|dose|mg\b|কত বার|koto bar)/i.test(text) && !/doctor|ডাক্তার/i.test(text))
@@ -134,7 +139,7 @@ export const mockModel = (req: AiChatRequest): Partial<AiChatResponse> => {
     return call("request_human", { reason: "patient asked for a person" });
   if (/(mother|father|family|মা|বাবা|মায়ের|babar|mayer)/i.test(t) && /(book|serial|সিরিয়াল)/i.test(t))
     return call("list_my_patients");
-  const reg = /name\s+([A-Za-z ]+?),\s*(male|female),\s*(\d{1,3})/i.exec(text);
+  const reg = REGISTER.exec(text);
   if (reg) return call("register_patient", { name: reg[1].trim(), gender: reg[2].toLowerCase(), age: Number(reg[3]) });
   if (/(ahead|queue|আগে কতজন|koto jon)/i.test(t)) return call("get_queue_status");
   if (/(report|রিপোর্ট|result|hba1c)/i.test(t)) return call("get_lab_report_status");

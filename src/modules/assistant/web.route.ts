@@ -15,7 +15,7 @@ import { MENU_OPTIONS } from "./interactions";
 
 /**
  * PUBLIC WEB CHAT (no login). The visitor is identified by an anonymous random id in an httpOnly
- * cookie — nothing personal until they verify their phone with a one-time code.
+ * cookie. To book they give a mobile number (no code); the chat then sees only what it added itself.
  * Production uses SameSite=None + Secure so the embeddable widget (an iframe on the hospital's
  * website) keeps its session.
  */
@@ -37,10 +37,12 @@ const sessionIdOf = (req: Request, res: Response) => {
   return id;
 };
 
-const conversationView = (c: { status: string; verifiedPhone?: string | null; language?: string } | null) => ({
+const conversationView = (
+  c: { status: string; verifiedPhone?: string | null; phone?: string | null; language?: string } | null,
+) => ({
   status: c?.status ?? "bot_active",
   verified: Boolean(c?.verifiedPhone),
-  phoneMasked: c?.verifiedPhone ? `•••••${c.verifiedPhone.slice(-3)}` : null,
+  phoneMasked: c?.verifiedPhone || c?.phone ? `•••••${String(c.verifiedPhone ?? c.phone).slice(-3)}` : null,
   language: c?.language ?? "bn",
 });
 

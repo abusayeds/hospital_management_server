@@ -3,11 +3,9 @@ import { LabOrderModel } from "../../src/modules/clinical/lab/labOrder.model";
 import { ConversationDocument, ConversationModel } from "../../src/modules/assistant/conversation.model";
 import { handleInbound } from "../../src/modules/assistant/engine";
 import { runTool } from "../../src/modules/assistant/tools";
-import { VerificationModel } from "../../src/modules/assistant/verification.model";
 import { AppointmentModel } from "../../src/modules/hospital/appointment/appointment.model";
 import { createAppointment, createClinic, createPatients, TOMORROW } from "../fixtures";
 import { useTestDatabase } from "../helpers";
-import { scriptedProvider } from "../assistant-fakes";
 
 const WEB_ID = "d".repeat(32);
 
@@ -28,10 +26,10 @@ describe("Assistant tools", () => {
     return { ...out, ui: ctx.ui };
   };
 
-  it("personal tools refuse to work before the phone is verified", async () => {
+  it("personal tools ask for the mobile number first", async () => {
     const conv = await newConv();
     const res = await call(conv, "get_my_appointments");
-    expect(res.result).toMatchObject({ error: "not_verified" });
+    expect(res.result).toMatchObject({ error: "no_phone" });
     expect(res.log.success).toBe(false);
   });
 
@@ -48,7 +46,9 @@ describe("Assistant tools", () => {
       doctorId: String(doctor._id),
       date: TOMORROW(),
     });
-    expect(viaRef.result).toMatchObject({ error: "That patient is not linked to the verified phone number." });
+    expect(viaRef.result).toMatchObject({
+      error: "That patient was not added in this chat. Use register_patient first.",
+    });
     const viaId = await call(conv, "book_appointment", {
       patientRef: String(stranger._id),
       doctorId: String(doctor._id),
@@ -118,36 +118,58 @@ describe("Assistant tools", () => {
     expect((await AppointmentModel.findById(myAppt._id))?.status).toBe("cancelled");
   });
 
-  it("OTP: hashed storage, typed code verifies, wrong codes are limited, resends are rate limited", async () => {
-    const [patient] = await createPatients(1);
-    setAiProvider(scriptedProvider([() => ({ text: "ok" })]).provider);
+  it("web: a typed number + name/age/gender books without any code", async () => {
+    const { doctor } = await createClinic();
     const conv = await newConv();
-    const started = await call(conv, "start_verification", { phone: patient.phone.replace("+88", "") });
-    expect(started.ui[0]).toMatchObject({ type: "otp_request" });
-    const v = (await VerificationModel.findOne())!;
-    expect(v.codeHash).not.toContain(v.devCode!);
-    expect(v.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(5 * 60 * 1000);
+    expect(await call(conv, "set_phone", { phone: "01711-998877" })).toMatchObject({ result: { status: "saved" } });
+    const reg = await call(conv, "register_patient", { name: "Rahima Akter", gender: "female", age: 34 });
+    const ref = (reg.result as { patient: { ref: string } }).patient.ref;
 
-    // resend within 60 s is refused
-    const resend = await call(conv, "start_verification", { phone: patient.phone.replace("+88", "") });
-    expect(resend.result).toMatchObject({ error: expect.stringContaining("wait") });
+    await call(conv, "book_appointment", { patientRef: ref, doctorId: String(doctor._id), date: TOMORROW() });
+    const pending = (await ConversationModel.findById(conv._id))!.pendingAction!;
+    await handleInbound({ channel: "web", channelUserId: WEB_ID, replyId: `confirm|${pending.id}` });
+    const appt = await AppointmentModel.findOne().populate("patient", "name phone");
+    expect(appt).toMatchObject({ source: "chatbot", status: "booked" });
+    expect(appt!.patient).toMatchObject({ name: "Rahima Akter", phone: "+8801711998877" });
 
-    // 5 wrong attempts lock the code
-    const wrong = v.devCode === "000000" ? "111111" : "000000";
-    for (let i = 0; i < 5; i++) await handleInbound({ channel: "web", channelUserId: WEB_ID, text: wrong });
-    const locked = await handleInbound({ channel: "web", channelUserId: WEB_ID, text: v.devCode! });
-    expect((locked.messages[0] as { text: string }).text).toContain("Too many wrong attempts");
-    expect((await ConversationModel.findById(conv._id))?.verifiedPhone).toBeFalsy();
+    // The chat sees the appointment it booked
+    const fresh = (await ConversationModel.findById(conv._id))! as ConversationDocument;
+    const mine = await call(fresh, "get_my_appointments");
+    expect(mine.result).toHaveLength(1);
   });
 
-  it("a correct code verifies the phone and shows the family list", async () => {
+  it("web: typing someone's number never reveals their patients, older appointments or lab tests", async () => {
+    const { doctor } = await createClinic();
     const [patient] = await createPatients(1);
+    const old = await createAppointment({ patient, doctor, status: "booked", date: TOMORROW() });
     const conv = await newConv();
-    await call(conv, "start_verification", { phone: patient.phone });
-    const v = (await VerificationModel.findOne())!;
-    const res = await handleInbound({ channel: "web", channelUserId: WEB_ID, text: v.devCode! });
-    expect(res.messages[1]).toMatchObject({ type: "list", kind: "patients" });
-    expect(res.conversation.verifiedPhone).toBe(patient.phone);
+    await call(conv, "set_phone", { phone: patient.phone });
+
+    expect((await call(conv, "list_my_patients")).result).toEqual([]); // nobody listed by the number alone
+    expect((await call(conv, "get_my_appointments")).result).toEqual({ found: 0 });
+    expect((await call(conv, "get_lab_report_status")).result).toMatchObject({ error: "not_available_here" });
+
+    // Naming the same person reuses the existing record (no duplicate) — still not their old bookings
+    const reg = await call(conv, "register_patient", { name: patient.name, gender: "female", age: 36 });
+    expect(reg.result).toMatchObject({ alreadyExists: true });
+    expect((await call(conv, "get_my_appointments")).result).toEqual({ found: 0 });
+
+    // An old appointment's id smuggled in as a reference is refused
+    conv.refs.set("A9", String(old._id));
+    await conv.save();
+    const cancel = await call(conv, "cancel_appointment", { appointmentRef: "A9" });
+    expect(cancel.log.success).toBe(false);
+    expect((await AppointmentModel.findById(old._id))?.status).toBe("booked");
+  });
+
+  it("web: changing the number starts fresh", async () => {
+    const conv = await newConv();
+    await call(conv, "set_phone", { phone: "01711998877" });
+    await call(conv, "register_patient", { name: "Rahima Akter", gender: "female", age: 34 });
+    expect(conv.linkedPatientIds).toHaveLength(1);
+    await call(conv, "set_phone", { phone: "01811998877" });
+    expect(conv.linkedPatientIds).toHaveLength(0);
+    expect((await call(conv, "set_phone", { phone: "12345" })).log.success).toBe(false);
   });
 
   it("lab report status never contains result values", async () => {

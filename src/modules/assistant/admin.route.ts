@@ -14,8 +14,6 @@ import { whatsappInfo } from "./channels/whatsapp/adapter";
 import { isWhatsAppConfigured } from "./channels/whatsapp/client";
 import { sendRawWhatsApp } from "../automation/outbox/outbox.service";
 import { ConversationModel } from "./conversation.model";
-import { maskPhone } from "./otp.service";
-import { VerificationModel } from "./verification.model";
 
 const ok = (res: Response, message: string, data: unknown) =>
   sendResponse(res, { statusCode: 200, success: true, message, data });
@@ -68,24 +66,6 @@ router.post(
     await recordAudit({ req, action: "UPDATE", entityType: "Channel", meta: { test: "whatsapp", ok: r.ok } });
     if (!r.ok) throw new AppError(502, `WhatsApp refused the message: ${r.error}`, "BAD_REQUEST");
     ok(res, "Test message sent", r);
-  }),
-);
-
-/** Development only: the codes the log "sent" (SMS is not built yet) */
-router.get(
-  "/dev-otps",
-  requireAnyPermission(["settings:manage", "inbox:manage"]),
-  catchAsync(async (_req: Request, res: Response) => {
-    if (env.NODE_ENV === "production") throw new AppError(404, "Not available in production.");
-    const rows = await VerificationModel.find({ usedAt: null, expiresAt: { $gt: new Date() } })
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .lean<any[]>();
-    ok(
-      res,
-      "Development codes",
-      rows.map((r) => ({ phone: maskPhone(r.phone), code: r.devCode, expiresAt: r.expiresAt, attempts: r.attempts })),
-    );
   }),
 );
 

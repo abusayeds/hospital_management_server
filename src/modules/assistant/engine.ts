@@ -84,16 +84,18 @@ const loadConversation = async (inbound: InboundMessage) => {
 const storeMessage = (conv: ConversationDocument, fields: Record<string, unknown>) =>
   ChatMessageModel.create({ conversation: conv._id, channel: conv.channel, ...fields }) as Promise<ChatMessageDocument>;
 
-/** Who the model is talking to — verification state and short references only (no phone, no ids) */
+/** Who the model is talking to — phone state and short references only (no phone, no ids) */
 const identityLine = async (conv: ConversationDocument) => {
-  if (!conv.verifiedPhone) return "Phone NOT verified. Personal actions need start_verification first.";
+  const phone = conv.verifiedPhone ?? conv.phone;
+  if (!phone) return "No phone number yet. Personal actions need the mobile number (set_phone) first.";
   const patients = await PatientModel.find({ _id: { $in: conv.linkedPatientIds } })
     .select("name gender dateOfBirth")
     .lean<any[]>();
   const list = patients.map(
     (p) => `${refFor(conv, "P", String(p._id))} (${String(p.name).split(" ")[0]}, ${p.gender})`,
   );
-  return `Phone verified (ends with ${conv.verifiedPhone.slice(-2)}). Patients on this phone: ${list.join(", ") || "none yet (use register_patient)"}.`;
+  const kind = conv.verifiedPhone ? "WhatsApp number" : "Phone given (no code needed)";
+  return `${kind} (ends with ${phone.slice(-2)}). Patients in this chat: ${list.join(", ") || "none yet (ask name, age, gender → register_patient)"}.`;
 };
 
 /** Last messages as model turns (text only; staff replies are marked so the model knows) */

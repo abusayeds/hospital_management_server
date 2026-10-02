@@ -7,14 +7,40 @@ import type { ConversationDocument } from "../conversation.model";
 import { refFor, resolveRef } from "../refs";
 
 /**
- * OWNERSHIP CHECKS — the heart of tool authorisation. A reference from the model is only a hint:
- * the record is loaded and must belong to the conversation's VERIFIED phone, or the call fails.
+ * WHOSE RECORDS A CHAT MAY TOUCH — the heart of tool authorisation.
+ *  - WhatsApp: the sender's number is proven by WhatsApp itself (`verifiedPhone`), so every patient
+ *    and appointment on that number belongs to the chat.
+ *  - Web: the visitor only TYPES a number (`phone`, no code). Anyone could type someone else's
+ *    number, so the chat sees only the patients it added itself and the appointments it booked
+ *    itself — never older records on that number.
+ * A reference from the model is only a hint: the record is loaded and checked here, or the call fails.
  */
+export const contactPhone = (conv: ConversationDocument) => conv.verifiedPhone ?? conv.phone ?? null;
+
+const hasId = (ids: unknown[] | undefined, id: unknown) => (ids ?? []).some((x) => String(x) === String(id));
+
+/** Database filter for the patients this chat may book for */
+export const myPatientsFilter = (conv: ConversationDocument) =>
+  conv.verifiedPhone ? { phone: conv.verifiedPhone } : { _id: { $in: conv.linkedPatientIds }, phone: conv.phone };
+
+/** Database filter for the appointments this chat may see and change */
+export const myAppointmentsFilter = (conv: ConversationDocument) =>
+  conv.verifiedPhone ? { patient: { $in: conv.linkedPatientIds } } : { _id: { $in: conv.chatAppointmentIds ?? [] } };
+
+/** May this chat act on an appointment (given the phone of the appointment's patient)? */
+export const ownsAppointment = (conv: ConversationDocument, appointmentId: unknown, patientPhone: unknown) => {
+  const phone = contactPhone(conv);
+  if (!phone || patientPhone !== phone) return false;
+  return Boolean(conv.verifiedPhone) || hasId(conv.chatAppointmentIds, appointmentId);
+};
+
 export const ownedPatient = async (conv: ConversationDocument, ref: unknown) => {
   const id = resolveRef(conv, "P", ref);
   if (!id) throw new AppError(400, "Unknown patient. Call list_my_patients and use its P-reference.");
-  const patient = await PatientModel.findOne({ _id: id, phone: conv.verifiedPhone });
-  if (!patient) throw new AppError(403, "That patient is not linked to the verified phone number.", "FORBIDDEN");
+  const phone = contactPhone(conv);
+  const patient = phone ? await PatientModel.findOne({ _id: id, phone }) : null;
+  if (!patient || (!conv.verifiedPhone && !hasId(conv.linkedPatientIds, id)))
+    throw new AppError(403, "That patient was not added in this chat. Use register_patient first.", "FORBIDDEN");
   return patient as any;
 };
 
@@ -24,8 +50,8 @@ export const ownedAppointment = async (conv: ConversationDocument, ref: unknown)
   const appt = await AppointmentModel.findById(id)
     .populate("patient", "name phone")
     .populate("doctor", "title name roomNo");
-  if (!appt || (appt as any).patient?.phone !== conv.verifiedPhone)
-    throw new AppError(403, "That appointment does not belong to the verified phone number.", "FORBIDDEN");
+  if (!appt || !ownsAppointment(conv, appt._id, (appt as any).patient?.phone))
+    throw new AppError(403, "That appointment does not belong to this chat.", "FORBIDDEN");
   return appt as any;
 };
 

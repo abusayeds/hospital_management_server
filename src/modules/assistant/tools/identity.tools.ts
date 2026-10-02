@@ -2,31 +2,25 @@
 import { z } from "zod";
 import AppError from "../../../errors/AppError";
 import { ageOn } from "../../../utils/date";
+import { toE164Bd } from "../../../utils/phone";
 import { createPatient } from "../../patients/patient.service";
 import { PatientModel } from "../../patients/patient.model";
 import type { OutboundMessage } from "../assistant.types";
 import type { ConversationDocument } from "../conversation.model";
-import { registerInteraction } from "../interactions";
-import {
-  hasPendingVerification,
-  linkPatients,
-  OTP_RESEND_SECONDS,
-  startVerification,
-  verifyCode,
-} from "../otp.service";
+import { linkPatients } from "../otp.service";
 import { refFor } from "../refs";
-import { maskCode, patientForModel, sourceOf } from "./shared";
+import { contactPhone, maskCode, myPatientsFilter, patientForModel, sourceOf } from "./shared";
 import { defineTool } from "./types";
 
-/** The family list shown after verification: each patient on the phone + "someone else" */
+/** "Who is it for?": the patients this chat may book for + "someone else" */
 export const patientsMessage = async (conv: ConversationDocument): Promise<OutboundMessage> => {
-  const patients = await PatientModel.find({ phone: conv.verifiedPhone }).sort({ createdAt: 1 }).limit(9).lean<any[]>();
+  const patients = await PatientModel.find(myPatientsFilter(conv)).sort({ createdAt: 1 }).limit(9).lean<any[]>();
   return {
     type: "list",
     kind: "patients",
     text: patients.length
       ? "কার জন্য সিরিয়াল নিতে চান? · Who is the appointment for?"
-      : "এই নম্বরে কোনো রোগী নিবন্ধিত নেই। রোগীর নাম, বয়স ও লিঙ্গ লিখুন। · No patient on this number yet — tell me the name, age and gender.",
+      : "রোগীর নাম, বয়স ও লিঙ্গ লিখুন। · Tell me the patient's name, age and gender.",
     button: "রোগী বাছুন",
     items: [
       ...patients.map((p) => ({
@@ -39,10 +33,10 @@ export const patientsMessage = async (conv: ConversationDocument): Promise<Outbo
   };
 };
 
-export const startVerificationTool = defineTool({
-  name: "start_verification",
+export const setPhoneTool = defineTool({
+  name: "set_phone",
   description:
-    "Send a 6-digit code to the patient's Bangladeshi mobile number to verify it (needed before any personal action).",
+    "Save the patient's Bangladeshi mobile number for booking (no code is sent). Call it as soon as the patient gives the number.",
   parameters: {
     type: "object",
     properties: { phone: { type: "string", description: "Mobile number as the patient typed it, e.g. 01711223344" } },
@@ -50,55 +44,38 @@ export const startVerificationTool = defineTool({
   },
   schema: z.object({ phone: z.string().trim().min(8).max(20) }),
   run: async ({ phone }, ctx) => {
-    if (ctx.conversation.verifiedPhone) return { summary: "already verified", data: { status: "already_verified" } };
-    const r = await startVerification(ctx.conversation, phone);
+    const conv = ctx.conversation;
+    // WhatsApp: the sender's own number is already known and cannot be swapped for another
+    if (conv.verifiedPhone) return { summary: "phone already known", data: { status: "already_set" } };
+    const e164 = toE164Bd(phone);
+    if (!e164)
+      throw new AppError(400, "That is not a valid Bangladeshi mobile number (01XXXXXXXXX).", "VALIDATION_ERROR");
+    if (conv.phone !== e164) {
+      // A different number starts fresh: nothing added or booked under the old number carries over
+      conv.phone = e164;
+      conv.linkedPatientIds = [];
+      conv.chatAppointmentIds = [];
+      conv.pendingAction = null;
+      conv.markModified("pendingAction");
+      await conv.save();
+    }
     return {
-      summary: "code sent",
-      data: { status: "code_sent", note: "Ask the patient to type the 6-digit code they received." },
-      ui: [
-        {
-          type: "otp_request",
-          text: `${r.phoneMasked} নম্বরে ৬ সংখ্যার কোড পাঠানো হয়েছে। কোডটি লিখুন। · Enter the 6-digit code sent to ${r.phoneMasked}.`,
-          phoneMasked: r.phoneMasked,
-          resendAfterSeconds: OTP_RESEND_SECONDS,
-        },
-      ],
-    };
-  },
-});
-
-export const verifyCodeTool = defineTool({
-  name: "verify_code",
-  description: "Check the 6-digit verification code the patient typed.",
-  parameters: { type: "object", properties: { code: { type: "string" } }, required: ["code"] },
-  schema: z.object({
-    code: z
-      .string()
-      .trim()
-      .regex(/^\d{6}$/, "must be 6 digits"),
-  }),
-  run: async ({ code }, ctx) => {
-    await verifyCode(ctx.conversation, code);
-    const patients = await PatientModel.find({ phone: ctx.conversation.verifiedPhone }).lean<any[]>();
-    return {
-      summary: "verified",
-      data: { verified: true, patients: patients.map((p) => patientForModel(ctx.conversation, p)) },
-      ui: [await patientsMessage(ctx.conversation)],
+      summary: "phone saved",
+      data: { status: "saved", note: "Now ask for the patient's name, age and gender, then call register_patient." },
     };
   },
 });
 
 export const listMyPatients = defineTool({
   name: "list_my_patients",
-  description: "Patients registered with the verified phone number (families share one phone).",
+  description:
+    "Patients this chat can book for (WhatsApp: everyone on the sender's number; web: patients added in this chat).",
   parameters: { type: "object", properties: {} },
   schema: z.object({}).passthrough(),
-  needsVerification: true,
+  needsPhone: true,
   run: async (_args, ctx) => {
-    await linkPatients(ctx.conversation);
-    const patients = await PatientModel.find({ phone: ctx.conversation.verifiedPhone })
-      .sort({ createdAt: 1 })
-      .lean<any[]>();
+    if (ctx.conversation.verifiedPhone) await linkPatients(ctx.conversation);
+    const patients = await PatientModel.find(myPatientsFilter(ctx.conversation)).sort({ createdAt: 1 }).lean<any[]>();
     return {
       summary: `${patients.length} patients`,
       data: patients.map((p) => patientForModel(ctx.conversation, p)),
@@ -110,7 +87,8 @@ export const listMyPatients = defineTool({
 export const registerPatientTool = defineTool({
   name: "register_patient",
   description:
-    "Register a NEW patient on the verified phone (e.g. a family member). Only after the patient gave name, gender and age.",
+    "Add the patient (or a family member) on the saved phone. Only after the patient gave name, gender and age. " +
+    "If the same person is already registered on that phone, their existing record is used.",
   parameters: {
     type: "object",
     properties: {
@@ -125,21 +103,27 @@ export const registerPatientTool = defineTool({
     gender: z.enum(["male", "female", "other"]),
     age: z.coerce.number().int().min(0).max(120),
   }),
-  needsVerification: true,
+  needsPhone: true,
   run: async ({ name, gender, age }, ctx) => {
     const conv = ctx.conversation;
+    const link = async (id: unknown) => {
+      if (conv.verifiedPhone) await linkPatients(conv);
+      else if (!conv.linkedPatientIds.some((p) => String(p) === String(id))) conv.linkedPatientIds.push(id as any);
+      await conv.save();
+    };
     try {
       const p = await createPatient(
-        { name, gender, ageYears: age, phone: conv.verifiedPhone!, registrationSource: sourceOf(conv) },
+        { name, gender, ageYears: age, phone: contactPhone(conv)!, registrationSource: sourceOf(conv) },
         {},
       );
-      await linkPatients(conv);
+      await link(p._id);
       return { summary: "patient registered", data: { registered: true, patient: patientForModel(conv, p) } };
     } catch (err) {
       // Same phone + similar name already exists → use that record instead of creating a duplicate
       if (err instanceof AppError && err.code === "DUPLICATE_KEY") {
         const existing = (err.details as { possibleDuplicates: { id: string }[] }).possibleDuplicates[0];
         const p = await PatientModel.findById(existing.id).lean<any>();
+        await link(p._id);
         return {
           summary: "already registered",
           data: { registered: false, alreadyExists: true, patient: patientForModel(conv, p) },
@@ -148,22 +132,4 @@ export const registerPatientTool = defineTool({
       throw err;
     }
   },
-});
-
-/** A 6-digit message (or the OTP box) while a code is pending is checked in code, not by the model */
-registerInteraction(async (conv, replyId, text) => {
-  const typed = /^\s*\d{6}\s*$/.test(text ?? "") ? text!.trim() : null;
-  const code = replyId.startsWith("otp|") ? replyId.slice(4) : typed;
-  if (!code || conv.verifiedPhone || !(await hasPendingVerification(conv))) return null;
-  try {
-    await verifyCode(conv, code);
-    return {
-      messages: [
-        { type: "text", text: "✅ আপনার নম্বর যাচাই হয়েছে। · Your number is verified." },
-        await patientsMessage(conv),
-      ],
-    };
-  } catch (err) {
-    return { messages: [{ type: "text", text: err instanceof AppError ? err.message : "Could not verify the code." }] };
-  }
 });

@@ -7,7 +7,6 @@ import { DepartmentModel } from "../../src/modules/hospital/department/departmen
 import { getDaySlotsFor } from "../../src/modules/hospital/scheduling/scheduling.service";
 import { createPatient } from "../../src/modules/patients/patient.service";
 import type { ConversationDocument } from "../../src/modules/assistant/conversation.model";
-import { VerificationModel } from "../../src/modules/assistant/verification.model";
 import { addDays, todayInDhaka } from "../../src/utils/date";
 
 /**
@@ -42,7 +41,7 @@ export type Scenario = {
   lang: "bn" | "en" | "banglish";
   title: string;
   channel: "web" | "whatsapp";
-  verified?: boolean; // web: start already verified (WhatsApp is always verified)
+  verified?: boolean; // web: start with a proven number (WhatsApp always has one)
   family?: { name: string; gender: "male" | "female"; age: number }[];
   setup?: (w: World) => Promise<void>;
   steps: Step[];
@@ -80,11 +79,6 @@ const confirmTap = async (w: World) => {
   const { ConversationModel } = await import("../../src/modules/assistant/conversation.model");
   const conv = await ConversationModel.findById(w.conv?._id);
   return conv?.pendingAction ? { replyId: `confirm|${conv.pendingAction.id}`, label: "Confirm" } : null;
-};
-
-const otpTap = async (w: World) => {
-  const v = await VerificationModel.findOne({ conversation: w.conv?._id }).sort({ createdAt: -1 });
-  return v?.devCode ? { replyId: `otp|${v.devCode}`, label: "••••••" } : null;
 };
 
 const todayAppointment = async (w: World) => {
@@ -206,17 +200,18 @@ export const SCENARIOS: Scenario[] = [
     expect: { tools: ["search_doctors"] },
   },
   {
-    id: "book-unverified-web",
+    id: "book-web-no-phone",
     lang: "banglish",
-    title: "kal medicine doctor er serial chai — web, not verified: no booking before verification",
+    title: "kal medicine doctor er serial chai — web, no number yet: asks for the mobile number, books nothing",
     channel: "web",
     steps: [{ text: "kal medicine doctor er serial chai" }, { tap: medicineSlotTap }],
     expect: {
       tools: ["search_doctors"],
       noTools: ["register_patient"],
+      require: [/mobile|phone|নম্বর|ফোন/i],
       check: async (w) =>
         (await AppointmentModel.countDocuments({ patient: { $in: w.patients.map((p) => p._id) } }))
-          ? "booked without verification"
+          ? "booked without a phone number"
           : null,
     },
   },
@@ -237,14 +232,19 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
-    id: "book-web-otp-e2e",
+    id: "book-web-phone-e2e",
     lang: "en",
-    title: "Web: verify with a code, choose a slot, confirm → appointment (source chatbot)",
+    title: "Web: number + name/age/gender (no code), choose a slot, confirm → appointment (source chatbot)",
     channel: "web",
     family: [{ name: "Karim Uddin", gender: "male", age: 52 }],
-    steps: [{ text: "My number is PHONE" }, { tap: otpTap }, { tap: medicineSlotTap }, { tap: confirmTap }],
+    steps: [
+      { text: "I want a medicine doctor. My number is PHONE. Patient: Karim Uddin, male, 52" },
+      { tap: medicineSlotTap },
+      { tap: confirmTap },
+    ],
     expect: {
-      tools: ["start_verification", "book_appointment"],
+      tools: ["set_phone", "register_patient", "book_appointment"],
+      noTools: ["list_my_patients"],
       check: async (w) => {
         const a = await AppointmentModel.findOne({ patient: w.patients[0]._id });
         return a?.source === "chatbot" ? null : "no chatbot appointment was created";
@@ -377,12 +377,12 @@ export const SCENARIOS: Scenario[] = [
     expect: { noAi: true },
   },
   {
-    id: "cancel-unverified",
+    id: "cancel-web-no-phone",
     lang: "en",
-    title: "Cancel my appointment without verification → verification first",
+    title: "Cancel my appointment on the web with no number yet → asks for the mobile number",
     channel: "web",
     steps: [{ text: "Cancel my appointment" }],
-    expect: { noTools: ["cancel_appointment"], require: [/verify|যাচাই|mobile/i] },
+    expect: { noTools: ["cancel_appointment"], require: [/mobile|phone|নম্বর|ফোন/i] },
   },
   {
     id: "cancel-needs-confirm",
