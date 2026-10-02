@@ -145,10 +145,10 @@ const envSchema = z.object({
   WHATSAPP_API_VERSION: z.string().default("v21.0"),
 
   GEMINI_API_KEY: optionalString,
-  GEMINI_MODEL: z.string().default("gemini-flash-latest"),
+  GEMINI_MODEL: z.string().default("gemini-3.5-flash"),
   GEMINI_FALLBACK_MODELS: z
     .string()
-    .default("gemini-3.5-flash,gemini-3.1-flash-lite,gemini-flash-lite-latest")
+    .default("gemini-3.1-flash-lite,gemini-flash-lite-latest,gemini-flash-latest")
     .transform((v) =>
       v
         .split(",")

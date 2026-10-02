@@ -13,26 +13,49 @@ import {
 
 const RETRYABLE_STATUS = [429, 500, 503, 504];
 
+// A model that hangs must not eat the whole request: each model gets this long, then the next one is tried
+const MODEL_TIMEOUT_MS = 9_000;
+// A model that just failed or hung is tried last for a while, so later requests go straight to one that works
+const COOLDOWN_MS = 5 * 60_000;
+const coolingUntil = new Map<string, number>();
+
 /**
- * Try each model in order: a retired model (404) or an overloaded one (429/5xx) falls through to the
- * next; any other error is final. Aborts (our timeout) are never retried.
+ * Try each model in order: a retired model (404), an overloaded one (429/5xx) or one that does not
+ * answer within MODEL_TIMEOUT_MS falls through to the next; any other error is final. The caller's
+ * own abort (the overall timeout) is never retried.
  */
 const withModelFallback = async <T>(
   models: string[],
   signal: AbortSignal | undefined,
-  run: (model: string) => Promise<T>,
+  run: (model: string, signal: AbortSignal) => Promise<T>,
 ) => {
+  const now = Date.now();
+  const cooling = (m: string) => (coolingUntil.get(m) ?? 0) > now;
+  const order = [...models.filter((m) => !cooling(m)), ...models.filter(cooling)];
   let lastError: unknown = null;
-  for (const model of models) {
+  for (const model of order) {
+    const attempt = new AbortController();
+    const stop = () => attempt.abort();
+    signal?.addEventListener("abort", stop, { once: true });
+    const timer = setTimeout(stop, MODEL_TIMEOUT_MS);
     try {
-      return await run(model);
+      const result = await run(model, attempt.signal);
+      coolingUntil.delete(model);
+      return result;
     } catch (error) {
       if (signal?.aborted) throw error;
+      const timedOut = attempt.signal.aborted;
       const status = Number((error as { status?: number })?.status);
-      logger.warn({ model, status }, "Gemini request failed");
+      logger.warn({ model, status, timedOut }, "Gemini request failed");
       lastError = error;
-      if (status === 404 || RETRYABLE_STATUS.includes(status)) continue;
+      if (timedOut || status === 404 || RETRYABLE_STATUS.includes(status)) {
+        coolingUntil.set(model, Date.now() + COOLDOWN_MS);
+        continue;
+      }
       throw error;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", stop);
     }
   }
   throw new RetryableAiError(String((lastError as Error)?.message ?? "All models failed"));
@@ -65,7 +88,7 @@ export const createGeminiProvider = (
     name: "gemini",
 
     async generate(req: AiRequest): Promise<AiResponse> {
-      return withModelFallback(models, req.signal, async (model) => {
+      return withModelFallback(models, req.signal, async (model, signal) => {
         const res = await client.models.generateContent({
           model,
           contents: [{ role: "user", parts: [{ text: req.prompt }] }],
@@ -74,7 +97,7 @@ export const createGeminiProvider = (
             temperature: req.temperature ?? 0.2,
             maxOutputTokens: req.maxOutputTokens,
             ...(req.json && { responseMimeType: "application/json" }),
-            abortSignal: req.signal,
+            abortSignal: signal,
           },
         });
         return {
@@ -89,7 +112,7 @@ export const createGeminiProvider = (
     },
 
     async chat(req: AiChatRequest): Promise<AiChatResponse> {
-      return withModelFallback(models, req.signal, async (model) => {
+      return withModelFallback(models, req.signal, async (model, signal) => {
         const res = await client.models.generateContent({
           model,
           contents: toContents(req.turns),
@@ -108,7 +131,7 @@ export const createGeminiProvider = (
                   },
                 ]
               : undefined,
-            abortSignal: req.signal,
+            abortSignal: signal,
           },
         });
         const calls = res.functionCalls ?? [];
