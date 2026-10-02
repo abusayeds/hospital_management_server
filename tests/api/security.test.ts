@@ -133,6 +133,8 @@ describe("Security hardening", () => {
         .send({ email: "admin@test.local", password: PASSWORD });
       expect(refused.status).toBe(429);
     });
+    // The block is stored first; the audit row and the admin alert follow it
+    await eventually(async () => Boolean(await OutboxMessageModel.exists({ toRef: "perm:settings:manage" })));
     const alert = await OutboxMessageModel.findOne({ toRef: "perm:settings:manage" }).lean();
     expect(alert?.renderedText).toContain("192.0.2.33");
 
