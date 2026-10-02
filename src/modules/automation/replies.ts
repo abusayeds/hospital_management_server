@@ -9,7 +9,7 @@ import type { ConversationDocument } from "../assistant/conversation.model";
 import { registerInteraction } from "../assistant/interactions";
 import { refFor } from "../assistant/refs";
 import { cancelAppointmentTool, getQueueStatus, rescheduleAppointmentTool } from "../assistant/tools/appointment.tools";
-import { getAvailableSlots } from "../assistant/tools/doctor.tools";
+import { doctorDayCard } from "../assistant/tools/doctor.tools";
 import { ownsAppointment } from "../assistant/tools/shared";
 import type { ToolContext } from "../assistant/tools/types";
 import { LabOrderModel } from "../clinical/lab/labOrder.model";
@@ -25,9 +25,9 @@ import { getTemplate } from "./templates/template.service";
  * REPLIES TO AUTOMATED MESSAGES. Buttons on reminders carry "auto|<action>|<id>". A reply (tapped, or
  * typed like "Cancel" / "বাতিল" / "2" within 48 hours of the message) is routed here BEFORE the model:
  *   confirm    → appointment.confirmedByPatient (ownership checked against the verified phone)
- *   reschedule → free slots of the same doctor → the chatbot's own reschedule tool (summary + Confirm)
+ *   reschedule → the doctor's next day with a serial → the chatbot's own reschedule tool (summary + Confirm)
  *   cancel     → the chatbot's own cancel tool (summary + Confirm → existing cancel service)
- *   rebook/book→ free slots of the right doctor → the normal booking flow
+ *   rebook/book→ the right doctor's next day with a serial → the normal booking flow
  *   queue      → the chatbot's queue-status tool
  *   stop/STOP  → opt out of all non-essential messages · START → opt back in
  * Nothing here books or cancels by itself — it only opens the existing, confirmed flows.
@@ -134,16 +134,15 @@ const optOutReply = async (l: "bn" | "en") => {
   return renderTemplate(tpl, l, {}).text;
 };
 
-// ------------------------------------------------------------------ slot offers (reusing the chatbot's slot tool)
+// ------------------------------------------------------------------ day offers (reusing the chatbot's day card)
 
-/** Free times of one doctor on the first day (from `from`, up to a week) that has any */
-const slotOffer = async (doctorId: string, from: string, skipDate?: string) => {
+/** The doctor's first day (from `from`, up to a week) with a serial left — the same card the chat shows */
+const dayOffer = async (doctorId: string, from: string, skipDate?: string) => {
   for (let i = 0; i < 7; i++) {
     const date = addDays(from, i);
     if (date === skipDate) continue;
-    const out = await getAvailableSlots.run({ doctorId, date }, {} as ToolContext);
-    const list = out.ui?.find((m) => m.type === "list");
-    if (list && list.type === "list" && list.items.length) return { date, list };
+    const { card, first } = await doctorDayCard(doctorId, date);
+    if (first && card.type === "card") return { date, card };
   }
   return null;
 };
@@ -183,7 +182,7 @@ const handle = async (
   args: string[],
   l: "bn" | "en",
 ): Promise<OutboundMessage[]> => {
-  const [id, date, time] = args;
+  const [id, date] = args;
   switch (action) {
     case "stop": {
       if (conv.verifiedPhone)
@@ -221,28 +220,25 @@ const handle = async (
           text(l === "bn" ? "এই অ্যাপয়েন্টমেন্টটি আর বদলানো যাবে না।" : "This appointment can no longer be changed."),
         ];
       const today = dhakaDate(new Date());
-      const offer = await slotOffer(String(a.doctor._id), today, a.doctorAbsent ? a.date : undefined);
+      const offer = await dayOffer(String(a.doctor._id), today, a.date); // another day than the current one
       if (!offer)
         return [
           text(
             l === "bn"
-              ? "সামনের এক সপ্তাহে ফাঁকা সময় নেই। রিসেপশনে ফোন করুন।"
-              : "No free times in the next week. Please call reception.",
+              ? "সামনের এক সপ্তাহে কোনো সিরিয়াল খালি নেই। রিসেপশনে ফোন করুন।"
+              : "No serial left in the next week. Please call reception.",
           ),
         ];
-      // The slot list of the chatbot, but each time moves THIS appointment (through the reschedule tool)
-      const items: ReplyOption[] = offer.list.items.map((it) => {
-        const t = it.id.split("|")[3];
-        return { ...it, id: `auto|move|${a._id}|${offer.date}|${t}` };
-      });
-      return [
-        { ...offer.list, items, text: `${offer.list.text}\n${l === "bn" ? "নতুন সময় বাছুন" : "Pick the new time"}` },
+      // The chatbot's day card, but its button moves THIS appointment (through the reschedule tool)
+      const actions: ReplyOption[] = [
+        { id: `auto|move|${a._id}|${offer.date}`, label: l === "bn" ? "✅ এই দিনে সরান" : "✅ Move to this day" },
       ];
+      return [{ ...offer.card, actions }];
     }
     case "move": {
       await ownedAppointmentById(conv, id);
       const out = await rescheduleAppointmentTool.run(
-        { appointmentRef: refFor(conv, "A", id), newDate: date, newSlotTime: time },
+        { appointmentRef: refFor(conv, "A", id), newDate: date },
         toolCtx(conv),
       );
       return out.ui ?? [];
@@ -269,7 +265,7 @@ const handle = async (
             options: [{ id: "menu|book", label: l === "bn" ? "সিরিয়াল নিন" : "Book appointment" }],
           },
         ];
-      const offer = await slotOffer(doctorId, dhakaDate(new Date()));
+      const offer = await dayOffer(doctorId, dhakaDate(new Date()));
       if (!offer)
         return [
           text(
@@ -278,7 +274,7 @@ const handle = async (
               : "No free times in the next week. Please call reception.",
           ),
         ];
-      return [offer.list]; // tapping a time continues in the normal booking flow (patient choice + Confirm)
+      return [offer.card]; // "Book" continues in the normal booking flow (patient choice + Confirm)
     }
   }
 };

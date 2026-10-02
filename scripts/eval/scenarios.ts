@@ -62,7 +62,7 @@ const departmentDoctor = async (name: string) => {
   return DoctorModel.findOne({ department: dept?._id, isActive: true });
 };
 
-/** The next free slot of a Medicine doctor, as the button a patient would tap */
+/** "Book" on a Medicine doctor's next day with a serial, as the button a patient would tap */
 const medicineSlotTap = async () => {
   const doctor = await departmentDoctor("Medicine");
   if (!doctor) return null;
@@ -70,7 +70,7 @@ const medicineSlotTap = async () => {
     const date = addDays(todayInDhaka(), i);
     const day = await getDaySlotsFor(doctor, date);
     if (day.nextAvailable)
-      return { replyId: `slot|${doctor._id}|${date}|${day.nextAvailable.time}`, label: day.nextAvailable.time };
+      return { replyId: `book|${doctor._id}|${date}`, label: "Book" };
   }
   return null;
 };

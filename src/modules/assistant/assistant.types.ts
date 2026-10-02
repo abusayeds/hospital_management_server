@@ -29,6 +29,7 @@ export type ReplyOption = {
 };
 
 export type CardKind =
+  | "doctor_day"
   | "booking_summary"
   | "booking_success"
   | "cancel_summary"

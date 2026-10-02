@@ -69,9 +69,8 @@ describe("Assistant tools", () => {
       patientRef: ref,
       doctorId: String(doctor._id),
       date: TOMORROW(),
-      slotTime: "09:30",
     });
-    expect(prepared.result).toMatchObject({ status: "awaiting_confirmation" });
+    expect(prepared.result).toMatchObject({ status: "awaiting_confirmation", estimatedTime: "9:00 AM" });
     expect(prepared.ui[0]).toMatchObject({ type: "card", kind: "booking_summary" });
     expect(await AppointmentModel.countDocuments()).toBe(0);
 
@@ -84,7 +83,8 @@ describe("Assistant tools", () => {
     });
     expect(res.messages[0]).toMatchObject({ type: "card", kind: "booking_success" });
     const appt = await AppointmentModel.findOne();
-    expect(appt).toMatchObject({ source: "chatbot", slotTime: "09:30", status: "booked" });
+    // No time was chosen: the next serial of the day (the first place in the queue)
+    expect(appt).toMatchObject({ source: "chatbot", slotTime: "09:00", serialNo: 1, status: "booked" });
     expect(res.conversation.metrics.bookingsCreated).toBe(1);
 
     // Pressing the same Confirm again does nothing

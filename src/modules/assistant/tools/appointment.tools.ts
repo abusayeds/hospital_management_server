@@ -3,7 +3,7 @@ import { randomBytes } from "crypto";
 import { z } from "zod";
 import AppError from "../../../errors/AppError";
 import { publish } from "../../../events/bus";
-import { DATE_PATTERN, TIME_PATTERN, addDays, nowMinutesInDhaka, toMinutes, todayInDhaka } from "../../../utils/date";
+import { DATE_PATTERN, addDays, nowMinutesInDhaka, toMinutes, todayInDhaka } from "../../../utils/date";
 import { AppointmentModel } from "../../hospital/appointment/appointment.model";
 import {
   bookAppointment,
@@ -64,35 +64,33 @@ const setPending = async (
   return pending;
 };
 
-/** The chosen slot must still be free (or pick the first free one when no time was given) */
-const checkSlot = async (doctorId: string, date: string, slotTime?: string) => {
+/** The next serial of the day: its place in the queue gives the estimated time. Patients never pick a time. */
+const nextSerialSlot = async (doctorId: string, date: string) => {
   const doctor = await loadActiveDoctor(doctorId);
   const day = await getDaySlotsFor(doctor, date);
-  const free = day.slots.filter((s) => s.available);
-  if (day.onLeave || !day.sessions.length || !free.length)
-    throw new AppError(409, "No free slots for this doctor on that date. Offer another date.", "CONFLICT");
-  const slot = slotTime ? free.find((s) => s.time === slotTime) : free[0];
-  if (!slot)
-    throw new AppError(409, "That time is no longer free.", "CONFLICT", {
-      freeTimes: free.slice(0, 6).map((s) => s.time),
-    });
-  return { doctor: doctor as any, slot };
+  const slot = day.slots.find((s) => s.available);
+  if (day.onLeave || !day.sessions.length || !slot)
+    throw new AppError(409, "No serial left for this doctor on that date. Offer another date.", "CONFLICT");
+  const session = day.sessions.find((s) => s.sessionKey === slot.sessionKey)!;
+  return { doctor: doctor as any, slot, session };
 };
+
+const sittingOf = (s: { labelBn: string; startTime: string; endTime: string }) =>
+  `${s.labelBn} ${time12(s.startTime)} – ${time12(s.endTime)}`;
 
 // ------------------------------------------------------------------ tools
 
 export const bookAppointmentTool = defineTool({
   name: "book_appointment",
   description:
-    "PREPARE a booking for one of the patient's own patients (P-reference). Shows a summary with Confirm; " +
-    "it is booked only when the patient confirms.",
+    "PREPARE a booking (the next serial of that day) for one of the patient's own patients (P-reference). " +
+    "Shows a summary with Confirm; it is booked only when the patient confirms. There is no time to choose.",
   parameters: {
     type: "object",
     properties: {
       patientRef: { type: "string", description: "P-reference from list_my_patients / register_patient" },
       doctorId: { type: "string" },
       date: { type: "string", description: "YYYY-MM-DD" },
-      slotTime: { type: "string", description: "HH:mm; omit for the first free time" },
     },
     required: ["patientRef", "doctorId", "date"],
   },
@@ -100,20 +98,14 @@ export const bookAppointmentTool = defineTool({
     patientRef: z.string().trim().max(5),
     doctorId: z.string().regex(/^[a-f\d]{24}$/i, "unknown doctor"),
     date: z.string().regex(DATE_PATTERN),
-    slotTime: z.string().regex(TIME_PATTERN).optional(),
   }),
   needsPhone: true,
-  run: async ({ patientRef, doctorId, date, slotTime }, ctx) => {
+  run: async ({ patientRef, doctorId, date }, ctx) => {
     const conv = ctx.conversation;
     const patient = await ownedPatient(conv, patientRef);
-    const { doctor, slot } = await checkSlot(doctorId, date, slotTime);
+    const { doctor, slot, session } = await nextSerialSlot(doctorId, date);
     const { fee, type } = await estimateFee(String(patient._id), doctor, date);
-    const pending = await setPending(conv, "book", {
-      patientId: String(patient._id),
-      doctorId,
-      date,
-      slotTime: slot.time,
-    });
+    const pending = await setPending(conv, "book", { patientId: String(patient._id), doctorId, date });
     const card: OutboundMessage = {
       type: "card",
       kind: "booking_summary",
@@ -123,14 +115,19 @@ export const bookAppointmentTool = defineTool({
         { label: "ডাক্তার · Doctor", value: `${doctor.title ?? ""} ${doctor.name}`.trim() },
         { label: "বিভাগ · Department", value: doctor.department?.name ?? "" },
         { label: "তারিখ · Date", value: dateLabel(date) },
-        { label: "সময় · Time", value: `${time12(slot.time)} (${slot.sessionLabel})` },
+        { label: "ডাক্তার বসবেন · Sitting", value: sittingOf(session) },
+        { label: "আনুমানিক সময় · Estimated time", value: `~${time12(slot.time)}` },
         { label: "ফি · Fee", value: `${taka(fee)}${type === "follow_up" ? " (follow-up)" : ""}` },
       ],
       actions: confirmActions(pending.id),
     };
     return {
       summary: "awaiting confirmation",
-      data: { status: "awaiting_confirmation", note: "Ask the patient to press Confirm on the summary." },
+      data: {
+        status: "awaiting_confirmation",
+        estimatedTime: time12(slot.time),
+        note: "Ask the patient to press Confirm. The serial number is given after Confirm.",
+      },
       ui: [card],
     };
   },
@@ -237,32 +234,29 @@ export const cancelAppointmentTool = defineTool({
 export const rescheduleAppointmentTool = defineTool({
   name: "reschedule_appointment",
   description:
-    "PREPARE moving one of the patient's appointments (A-reference) to a new date/time with the same doctor. " +
-    "Needs the patient's Confirm.",
+    "PREPARE moving one of the patient's appointments (A-reference) to a new date with the same doctor " +
+    "(the next serial of that date). Needs the patient's Confirm.",
   parameters: {
     type: "object",
     properties: {
       appointmentRef: { type: "string" },
       newDate: { type: "string", description: "YYYY-MM-DD" },
-      newSlotTime: { type: "string", description: "HH:mm; omit for the first free time" },
     },
     required: ["appointmentRef", "newDate"],
   },
   schema: z.object({
     appointmentRef: z.string().trim().max(5),
     newDate: z.string().regex(DATE_PATTERN),
-    newSlotTime: z.string().regex(TIME_PATTERN).optional(),
   }),
   needsPhone: true,
-  run: async ({ appointmentRef, newDate, newSlotTime }, ctx) => {
+  run: async ({ appointmentRef, newDate }, ctx) => {
     const appt = await ownedAppointment(ctx.conversation, appointmentRef);
     if (!["booked", "checked_in"].includes(appt.status))
       throw new AppError(409, `A "${appt.status.replace("_", " ")}" appointment cannot be moved.`, "CONFLICT");
-    const { slot } = await checkSlot(String(appt.doctor._id), newDate, newSlotTime);
+    const { slot } = await nextSerialSlot(String(appt.doctor._id), newDate);
     const pending = await setPending(ctx.conversation, "reschedule", {
       appointmentId: String(appt._id),
       date: newDate,
-      slotTime: slot.time,
     });
     return {
       summary: "awaiting confirmation",
@@ -276,7 +270,7 @@ export const rescheduleAppointmentTool = defineTool({
             { label: "রোগী · Patient", value: appt.patient.name },
             { label: "ডাক্তার · Doctor", value: `${appt.doctor.title ?? ""} ${appt.doctor.name}`.trim() },
             { label: "আগে · Was", value: `${dateLabel(appt.date)} ${time12(appt.slotTime)}` },
-            { label: "নতুন · New", value: `${dateLabel(newDate)} ${time12(slot.time)}` },
+            { label: "নতুন · New", value: `${dateLabel(newDate)} · আনুমানিক ~${time12(slot.time)}` },
           ],
           actions: confirmActions(pending.id),
         },
@@ -436,7 +430,7 @@ const bookingSuccess = (a: any): OutboundMessage => ({
     { label: "ডাক্তার · Doctor", value: a.doctor.displayName },
     { label: "রুম · Room", value: a.doctor.roomNo ?? "—" },
     { label: "তারিখ · Date", value: dateLabel(a.date) },
-    { label: "সময় · Time", value: time12(a.slotTime) },
+    { label: "আনুমানিক সময় · Estimated time", value: `~${time12(a.slotTime)}` },
   ],
   data: {
     serialNo: a.serialNo,
@@ -444,15 +438,16 @@ const bookingSuccess = (a: any): OutboundMessage => ({
     time: a.slotTime,
     doctor: a.doctor.displayName,
     room: a.doctor.roomNo ?? null,
-    note: "Please arrive 15 minutes early and check in at reception. · ১৫ মিনিট আগে এসে রিসেপশনে জানান।",
+    note:
+      "The time is an estimate from the serials before you. Please arrive 15 minutes early and check in at reception. · " +
+      "সময়টি আনুমানিক, আগের রোগীদের উপর নির্ভর করে। ১৫ মিনিট আগে এসে রিসেপশনে জানান।",
   },
 });
 
-/** Friendly error + free alternatives when a slot was taken between summary and confirm */
+/** Friendly error when booking failed at Confirm (e.g. the day filled up in between) */
 const failureMessages = (err: unknown): OutboundMessage[] => {
   const msg = err instanceof AppError ? err.message : "Sorry, that did not work. Please try again.";
-  const next = err instanceof AppError ? ((err.details as { nextSlots?: string[] })?.nextSlots ?? []) : [];
-  return [{ type: "text", text: `⚠️ ${msg}${next.length ? `\nFree times: ${next.map(time12).join(", ")}` : ""}` }];
+  return [{ type: "text", text: `⚠️ ${msg}` }];
 };
 
 const execute = async (conv: ConversationDocument, pending: PendingAction): Promise<OutboundMessage[]> => {
@@ -460,12 +455,13 @@ const execute = async (conv: ConversationDocument, pending: PendingAction): Prom
   const p = pending.payload as Record<string, string>;
   if (pending.type === "book") {
     const patient = await ownedPatient(conv, refFor(conv, "P", p.patientId)); // re-check ownership
+    const { slot } = await nextSerialSlot(p.doctorId, p.date); // the next serial NOW, not at summary time
     const a = await bookAppointment(
       {
         patientId: String(patient._id),
         doctorId: p.doctorId,
         date: p.date,
-        slotTime: p.slotTime,
+        slotTime: slot.time,
         source: sourceOf(conv),
         chatSessionId: String(conv._id),
       },
@@ -498,7 +494,8 @@ const execute = async (conv: ConversationDocument, pending: PendingAction): Prom
       },
     ];
   }
-  const moved = await rescheduleAppointment(String(appt._id), { date: p.date, slotTime: p.slotTime }, actor);
+  const { slot } = await nextSerialSlot(String(appt.doctor._id), p.date);
+  const moved = await rescheduleAppointment(String(appt._id), { date: p.date, slotTime: slot.time }, actor);
   return [bookingSuccess(moved)];
 };
 

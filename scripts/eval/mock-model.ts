@@ -119,15 +119,15 @@ export const mockModel = (req: AiChatRequest): Partial<AiChatResponse> => {
 
   const text = lastUserText(req);
   const t = text.toLowerCase();
-  const tap = /^Book doctorId (\w+) on (\S+) at (\S+)\./.exec(text);
+  const tap = /^Book doctorId (\w+) on (\d{4}-\d{2}-\d{2})/.exec(text);
   if (tap) {
     const ref = firstPatientRef(req.system);
     if (!hasPhone(req.system) || !ref)
       return say("প্রথমে আপনার মোবাইল নম্বর দিন। · Please share your mobile number first.");
-    return call("book_appointment", { patientRef: ref, doctorId: tap[1], date: tap[2], slotTime: tap[3] });
+    return call("book_appointment", { patientRef: ref, doctorId: tap[1], date: tap[2] });
   }
-  const chooseDoctor = /doctorId (\w+)\. Show free slots/.exec(text);
-  if (chooseDoctor) return call("get_available_slots", { doctorId: chooseDoctor[1], date: addDays(todayInDhaka(), 1) });
+  const chooseDoctor = /doctorId (\w+)\. When do they sit/.exec(text);
+  if (chooseDoctor) return call("get_doctor_day", { doctorId: chooseDoctor[1], date: addDays(todayInDhaka(), 1) });
 
   const phone = /(01[3-9]\d{8})/.exec(text.replace(/[\s-]/g, ""));
   if (phone && !hasPhone(req.system)) return call("set_phone", { phone: phone[1] });

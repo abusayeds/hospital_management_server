@@ -5,14 +5,13 @@ import { addDays, DATE_PATTERN, todayInDhaka } from "../../../utils/date";
 import { LabTestModel } from "../../hospital/catalog/catalog.models";
 import { searchDoctorsByText } from "../../hospital/doctor/doctor.service";
 import { DoctorModel } from "../../hospital/doctor/doctor.model";
-import { getDaySlotsFor, getDoctorSlots } from "../../hospital/scheduling/scheduling.service";
+import { getDaySlotsFor, loadActiveDoctor } from "../../hospital/scheduling/scheduling.service";
 import { getSettings } from "../../hospital/settings/settings.service";
 import type { OutboundMessage } from "../assistant.types";
 import { dateLabel, taka, time12 } from "./shared";
 import { defineTool } from "./types";
 
 const MAX_DOCTORS = 6;
-const MAX_SLOTS = 8;
 
 /** First date (from `from`, within the booking window) with a free slot, using the slot engine */
 const nextAvailable = async (doctorId: string, from: string) => {
@@ -40,7 +39,7 @@ export const searchDoctors = defineTool({
   name: "search_doctors",
   description:
     "Find active doctors by department (English or Bangla, e.g. 'Cardiology', 'শিশু') and/or name, with fee, " +
-    "weekly schedule and the next available date/time (from `date` if given).",
+    "weekly schedule and the next date with a free serial (from `date` if given).",
   parameters: {
     type: "object",
     properties: {
@@ -68,14 +67,14 @@ export const searchDoctors = defineTool({
             items: rows.map(({ d, next }) => ({
               id: `doctor|${d.id}`,
               label: d.displayName,
-              description: `${d.department.name} · ${taka(d.consultationFee)}${next ? ` · ${dateLabel(next.date)} ${time12(next.time)}` : ""}`,
+              description: `${d.department.name} · ${taka(d.consultationFee)}${next ? ` · ${dateLabel(next.date)}` : ""}`,
               meta: {
                 initials: initials(d.name),
                 department: d.department.name,
                 departmentBn: d.department.nameBn,
                 specialization: d.specialization,
                 fee: taka(d.consultationFee),
-                nextAvailable: next ? `${dateLabel(next.date)}, ${time12(next.time)}` : null,
+                nextAvailable: next ? dateLabel(next.date) : null,
               },
             })),
           },
@@ -92,7 +91,7 @@ export const searchDoctors = defineTool({
             fee: taka(d.consultationFee),
             followUpFee: taka(d.followUpFee),
             schedule: d.scheduleText,
-            nextAvailable: next,
+            nextAvailableDate: next?.date ?? null,
           }))
         : { found: 0, note: "No active doctor matches. Offer list_departments." },
       ui,
@@ -100,9 +99,72 @@ export const searchDoctors = defineTool({
   },
 });
 
-export const getAvailableSlots = defineTool({
-  name: "get_available_slots",
-  description: "Free appointment times of one doctor on one date (from search_doctors).",
+/** "সকাল 9:00 AM – 1:00 PM" for each sitting of the day */
+const sittingText = (sessions: { labelBn: string; startTime: string; endTime: string }[]) =>
+  sessions.map((s) => `${s.labelBn} ${time12(s.startTime)} – ${time12(s.endTime)}`).join(", ");
+
+/**
+ * One doctor on one date: when they sit, how many are booked, and roughly when the NEXT serial will be
+ * seen (the first free place in the queue). The patient never picks a time: booking always takes the
+ * next serial, and the serial + estimated time are told after Confirm.
+ */
+export const doctorDayCard = async (doctorId: string, date: string) => {
+  const doctor: any = await loadActiveDoctor(doctorId);
+  const day = await getDaySlotsFor(doctor, date);
+  const name = `${doctor.title ?? ""} ${doctor.name}`.trim();
+  const booked = day.sessions.reduce((n, s) => n + s.booked, 0);
+  const first = day.nextAvailable;
+  const reason = day.onLeave
+    ? "The doctor is on leave that day."
+    : !day.sessions.length
+      ? "The doctor does not sit that day."
+      : !first
+        ? "No serials left that day."
+        : null;
+  const next = reason ? await nextAvailable(doctorId, addDays(date, 1)) : null;
+  const card: OutboundMessage = {
+    type: "card",
+    kind: "doctor_day",
+    title: `${name} · ${dateLabel(date)}`,
+    fields: [
+      ...(day.sessions.length ? [{ label: "বসবেন · Sitting", value: sittingText(day.sessions) }] : []),
+      ...(day.sessions.length ? [{ label: "সিরিয়াল হয়েছে · Booked", value: `${booked} জন` }] : []),
+      first
+        ? { label: "পরের সিরিয়ালের আনুমানিক সময় · Next serial ~", value: `~${time12(first.time)}` }
+        : {
+            label: "অবস্থা · Status",
+            value: day.onLeave
+              ? "এই দিন ছুটিতে · On leave"
+              : !day.sessions.length
+                ? "এই দিন বসেন না · Not sitting"
+                : "এই দিনের সিরিয়াল শেষ · Fully booked",
+          },
+    ],
+    data: { doctorId, date },
+    actions: [
+      ...(first ? [{ id: `book|${doctorId}|${date}`, label: "✅ এই দিনে সিরিয়াল নিন · Book" }] : []),
+      ...(next ? [{ id: `day|${doctorId}|${next.date}`, label: `📅 ${dateLabel(next.date)}` }] : []),
+    ],
+  };
+  return {
+    card,
+    first,
+    data: {
+      doctor: name,
+      date,
+      sitting: day.sessions.map((s) => ({ session: s.label, from: time12(s.startTime), to: time12(s.endTime) })),
+      bookedSoFar: booked,
+      nextSerialEstimatedTime: first ? time12(first.time) : null,
+      ...(reason && { message: reason, nextDateWithSerial: next?.date ?? null }),
+    },
+  };
+};
+
+export const getDoctorDay = defineTool({
+  name: "get_doctor_day",
+  description:
+    "One doctor on one date: sitting hours, how many serials are booked and the estimated time of the next serial. " +
+    "Never offer times to choose — booking always takes the next serial.",
   parameters: {
     type: "object",
     properties: { doctorId: { type: "string" }, date: { type: "string", description: "YYYY-MM-DD" } },
@@ -113,43 +175,8 @@ export const getAvailableSlots = defineTool({
     date: z.string().regex(DATE_PATTERN),
   }),
   run: async ({ doctorId, date }) => {
-    const day = await getDoctorSlots(doctorId, date);
-    const free = day.slots.filter((s) => s.available);
-    // Spread the offer over the day instead of only the first minutes
-    const step = Math.max(1, Math.floor(free.length / MAX_SLOTS));
-    const offered = free.filter((_, i) => i % step === 0).slice(0, MAX_SLOTS);
-    const reason = day.onLeave
-      ? "The doctor is on leave that day."
-      : !day.sessions.length
-        ? "The doctor does not sit that day."
-        : !free.length
-          ? "No free slots that day."
-          : null;
-    return {
-      summary: `${free.length} free slots`,
-      data: {
-        date,
-        available: free.length,
-        times: offered.map((s) => s.time),
-        ...(reason && { message: reason, next: await nextAvailable(doctorId, addDays(date, 1)) }),
-      },
-      ui: offered.length
-        ? [
-            {
-              type: "list",
-              kind: "slots",
-              text: `${dateLabel(date)} — সময় বাছুন · Choose a time`,
-              button: "সময় দেখুন",
-              items: offered.map((s) => ({
-                id: `slot|${doctorId}|${date}|${s.time}`,
-                label: time12(s.time),
-                description: s.sessionLabel,
-                meta: { session: s.sessionLabel },
-              })),
-            },
-          ]
-        : [],
-    };
+    const { card, data, first } = await doctorDayCard(doctorId, date);
+    return { summary: first ? `next serial ~${first.time}` : "no serial that day", data, ui: [card] };
   },
 });
 

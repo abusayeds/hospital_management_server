@@ -10,7 +10,7 @@ import {
   getQueueStatus,
   rescheduleAppointmentTool,
 } from "./appointment.tools";
-import { getAvailableSlots, getTestPreparation, searchDoctors } from "./doctor.tools";
+import { getDoctorDay, getTestPreparation, searchDoctors } from "./doctor.tools";
 import { listMyPatients, registerPatientTool, setPhoneTool } from "./identity.tools";
 import { getHospitalInfo, listDepartments, requestHuman } from "./info.tools";
 import { searchKnowledgeBase } from "./knowledge.tools";
@@ -24,7 +24,7 @@ export const ASSISTANT_TOOLS: AssistantTool<any>[] = [
   searchKnowledgeBase,
   listDepartments,
   searchDoctors,
-  getAvailableSlots,
+  getDoctorDay,
   getTestPreparation,
   setPhoneTool,
   listMyPatients,

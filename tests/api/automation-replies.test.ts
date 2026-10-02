@@ -114,7 +114,8 @@ describe("replies to automated messages", () => {
     expect(a).toMatchObject({ status: "cancelled", cancelReason: "Cancelled by the patient via the assistant" });
 
     const times = await inbound({ replyId: `auto|rebook|${appt._id}`, title: "New time" });
-    expect(optionIds(times)[0]).toMatch(new RegExp(`^slot\\|${clinic.doctor._id}\\|`));
+    expect(times[0].rich.kind).toBe("doctor_day"); // the doctor's next day — no times to pick
+    expect(optionIds(times)[0]).toMatch(new RegExp(`^book\\|${clinic.doctor._id}\\|`));
   });
 
   it("a typed answer ('বাতিল') to the last automated message works like the button", async () => {
@@ -122,7 +123,7 @@ describe("replies to automated messages", () => {
     expect(replies[0].rich.kind).toBe("cancel_summary");
   });
 
-  it("Reschedule offers the same doctor's free times and moves the appointment after Confirm", async () => {
+  it("Reschedule offers the same doctor's next day and moves the appointment after Confirm", async () => {
     const list = await inbound({ replyId: `auto|reschedule|${appt._id}`, title: "Reschedule" });
     const moveId = optionIds(list).find((id) => id.startsWith(`auto|move|${appt._id}|`) && !id.includes(appt.date))!;
     expect(moveId).toBeTruthy();

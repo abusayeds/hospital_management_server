@@ -55,9 +55,12 @@ export const describeReply = (replyId: string, label?: string): string => {
     case "dept":
       return `Show doctors of the ${rest[0]} department.`;
     case "doctor":
-      return `I choose the doctor with doctorId ${rest[0]}. Show free slots.`;
-    case "slot":
-      return `Book doctorId ${rest[0]} on ${rest[1]} at ${rest[2]}.`;
+      return `I choose the doctor with doctorId ${rest[0]}. When do they sit?`;
+    case "day":
+      return `Show doctorId ${rest[0]} on ${rest[1]}.`;
+    case "book":
+    case "slot": // buttons from before serial-only booking: the time is ignored
+      return `Book doctorId ${rest[0]} on ${rest[1]}.`;
     case "patient":
       return rest[0] === "new"
         ? "It is for someone else who is not registered yet. Ask me their name, age and gender."
