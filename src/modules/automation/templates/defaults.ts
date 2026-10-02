@@ -298,6 +298,22 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
     isActive: true,
   },
   {
+    key: "pharmacy_expiry_alert",
+    description: "Internal: medicine batches expiring soon or expired on the shelf",
+    category: "alert",
+    channels: ["inapp"],
+    variables: [v("days", "30", "number"), v("soon", "4", "number"), v("expired", "1", "number")],
+    bodies: {
+      bn: "⏳ ফার্মেসি: {{soon}}টি ব্যাচের মেয়াদ {{days}} দিনের মধ্যে শেষ হবে, {{expired}}টি ব্যাচ মেয়াদোত্তীর্ণ অবস্থায় তাকে আছে। Pharmacy → Expiry Alerts দেখুন।",
+      en: "⏳ Pharmacy: {{soon}} batch(es) expire within {{days}} days and {{expired}} expired batch(es) are still on the shelf. Check Pharmacy → Expiry Alerts.",
+    },
+    buttons: [],
+    whatsappTemplateName: null,
+    whatsappLanguages: { bn: "bn", en: "en" },
+    whatsappParams: [],
+    isActive: true,
+  },
+  {
     key: "birthday_greeting",
     description: "Marketing: birthday wishes (opt-in only)",
     category: "promotion",

@@ -63,6 +63,8 @@ export type DomainEventMap = {
   "invoice.refunded": { invoiceId: Id; patientId: Id; amount: number };
   // AI daily report (Phase 7)
   "report.daily_generated": { reportId: Id; date: IsoDate; source: "ai" | "fallback" };
+  // Pharmacy: medicines handed over (against a prescription or at the counter) — billing makes the invoice
+  "medicine.dispensed": { dispenseId: Id; patientId: Id; visitId: Id | null };
 };
 
 export type DomainEventName = keyof DomainEventMap;
@@ -86,6 +88,7 @@ export const DOMAIN_EVENT_NAMES = [
   "payment.collected",
   "invoice.refunded",
   "report.daily_generated",
+  "medicine.dispensed",
 ] as const satisfies readonly DomainEventName[];
 
 export type DomainEvent<N extends DomainEventName = DomainEventName> = {

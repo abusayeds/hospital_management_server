@@ -100,6 +100,7 @@ export interface IMedicine extends IBaseFields {
   form: (typeof MEDICINE_FORMS)[number];
   manufacturer?: string;
   isActive: boolean;
+  reorderLevel?: number; // pharmacy: alert when stock falls to this many units
 }
 
 const MedicineSchema = new Schema<IMedicine>({
@@ -109,6 +110,7 @@ const MedicineSchema = new Schema<IMedicine>({
   form: { type: String, enum: MEDICINE_FORMS, required: true },
   manufacturer: { type: String, trim: true, maxlength: 120 },
   isActive: { type: Boolean, default: true, index: true },
+  reorderLevel: { type: Number, default: 20, min: 0, max: 100_000 },
 });
 // Text index: whole-word search across brand and generic names (prescription autocomplete, Phase 4)
 MedicineSchema.index({ brandName: "text", genericName: "text" }, { weights: { brandName: 3, genericName: 2 } });

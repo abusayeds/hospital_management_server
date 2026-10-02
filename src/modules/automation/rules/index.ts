@@ -4,3 +4,4 @@ import "./clinical.rules";
 import "./chat.rules";
 import "./staff.rules";
 import "./report.rules";
+import "./pharmacy.rules";
