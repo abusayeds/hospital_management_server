@@ -30,7 +30,7 @@ export const decryptField = (stored: string): string => {
 export const maskTail = (value: string, visible = 4): string =>
   value.length <= visible ? value : "•".repeat(value.length - visible) + value.slice(-visible);
 
-/** Constant-time string comparison (secrets such as the TV display key) — no timing leak */
+/** Constant-time string comparison for secrets — no timing leak */
 export const safeEqual = (a: string, b: string): boolean => {
   const ha = createHash("sha256").update(a).digest();
   const hb = createHash("sha256").update(b).digest();

@@ -128,7 +128,6 @@ Generate secrets:
 ```bash
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"   # JWT_SECRET_KEY
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"   # ENCRYPTION_KEY (exactly 64 hex)
-node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"   # QUEUE_DISPLAY_KEY
 ```
 Keep `ENCRYPTION_KEY` the same on every machine that uses the same database — NIDs encrypted with one key cannot
 be read with another. The server **refuses to start** if `.env` is invalid and lists every problem.
@@ -145,7 +144,6 @@ be read with another. The server **refuses to start** if `.env` is invalid and l
 | `JWT_SECRET_KEY` | ✅ | | ≥ 32 random characters |
 | `CLIENT_URL` | ✅ | | Allowed browser origin(s), comma-separated |
 | `ENCRYPTION_KEY` | ✅ | | 64 hex chars, AES-256-GCM key for patient NIDs |
-| `QUEUE_DISPLAY_KEY` | ✅ | | ≥ 16 chars; the waiting-room TV opens `/queue-display?key=…` |
 | `LOG_LEVEL`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, `JSON_BODY_LIMIT` | | info / 15 min / 300 / 100kb | |
 | `ACCESS_TOKEN_TTL_MINUTES` / `REFRESH_TOKEN_TTL_DAYS` / `BCRYPT_ROUNDS` | | 15 / 7 / 12 | |
 | `AUTH_RATE_LIMIT_MAX` / `REFRESH_RATE_LIMIT_MAX` / `REFRESH_REUSE_GRACE_SECONDS` | | 20 / 60 / 10 | |
@@ -240,7 +238,7 @@ routes, the assistant's tools, event consumers, seeds and tests.
 - `throw new AppError(status, message, code?, details?)`; wrap handlers in `catchAsync`.
 - `basePlugin` on domain models (timestamps, `createdBy/updatedBy`, soft delete auto-filtered).
 - Money in **poisha** (integer). Dates as `YYYY-MM-DD` in **Asia/Dhaka** (`todayInDhaka`, `addDays`, `ageOn`).
-- Real-time: personal data only to permission/doctor rooms; the public TV gets masked data via the display key.
+- Real-time: personal data only to permission/doctor rooms; the public queue board (no key) gets masked data only.
 - Domain events: `publish()` **after** the database change committed; payloads carry ids and dates only.
 - Windows: working files are CRLF; scripted multi-line replacements must normalise `\r\n` first.
 
@@ -360,7 +358,7 @@ message. Bookings made by the assistant go through the booking service and are a
   (`ALLOWED_TRANSITIONS`): booked → checked_in → in_consultation → completed; cancelled / no_show; send back.
   Reschedule links old/new rows. One booking service for every channel.
 - **Queue:** priority emergency > elderly > normal, then serial. Doctor "call next" / call specific / recall /
-  send back in transactions. TV display (`/display/queue?key=`) shows masked names; announcements via socket.
+  send back in transactions. Public queue board (`/display/queue`, no key) lists every doctor with masked names; announcements via socket.
 
 ---
 
@@ -488,7 +486,7 @@ automation rule (§15). To add an event: extend
 | GET/POST/PATCH | `/patients`, `/patients/:id`, `/patients/:id/appointments` | patient permissions | Patients |
 | GET/POST | `/appointments`, `/appointments/:id`, `/:id/check-in`, `/:id/cancel`, `/:id/no-show`, `/:id/reschedule`, `/:id/send-back` | appointment permissions | Booking & status |
 | GET/POST | `/queue/today`, `/queue/board`, `/queue/:doctorId/call-next`, `/queue/:doctorId/call/:appointmentId`, `/queue/:doctorId/recall` | queue permissions | Live queue |
-| GET | `/display/queue?key=` | display key | TV board (masked) |
+| GET | `/display/queue` | public | Queue board: every doctor, masked names |
 | GET | `/dashboard/today`, `/dashboard/stats` | see code | Dashboards |
 | POST / PATCH / GET | `/appointments/:id/vitals` | `vitals:create` / `vitals:read` | Record / correct / read vitals |
 | GET | `/vitals/worklist?doctorId` | `vitals:create`/`vitals:read` | Nurse list |
@@ -947,7 +945,7 @@ Billing and payments, analytics, AI daily report (on top of the digest), securit
 | Problem | Fix |
 | --- | --- |
 | `querySrv ECONNREFUSED` on start | Add `DNS_SERVERS=8.8.8.8,1.1.1.1` to `.env` |
-| "Invalid environment configuration" | Read the listed variables; compare with `.env.example` (Phase 3 added `ENCRYPTION_KEY`, `QUEUE_DISPLAY_KEY`) |
+| "Invalid environment configuration" | Read the listed variables; compare with `.env.example` (Phase 3 added `ENCRYPTION_KEY`) |
 | PDF answers 503 "PDF printing is not set up" | `npm run pdf:setup` (npm may block Puppeteer's postinstall), or set `PDF_BROWSER_PATH` |
 | AI summary says "not configured" | Set `AI_API_KEY` or `GEMINI_API_KEY`; check `AI_PROVIDER` is not `none` |
 | `409 VISIT_OPEN` on Call next | Close the current visit (or send the patient back) first |
