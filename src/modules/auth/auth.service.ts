@@ -145,6 +145,23 @@ export const login = async (email: string, password: string, req: Request) => {
   return { user: toPublicUser(user), ...session };
 };
 
+/** Patient portal: sign in a user verified by a one-time code to their phone (no password) */
+export const signInVerified = async (user: UserDocument, req: Request, method: string) => {
+  if (!user.isActive)
+    throw new AppError(403, "This account has been deactivated. Please contact the hospital.", "ACCOUNT_DISABLED");
+  await UserModel.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } });
+  const session = await issueSession(user, req);
+  await recordAudit({
+    req,
+    actor: actorOf(user),
+    action: "LOGIN",
+    entityType: "User",
+    entityId: user._id,
+    meta: { sessionId: session.sessionId, method },
+  });
+  return { user: toPublicUser(user), ...session };
+};
+
 const lockedMessage = (seconds: number) =>
   `Too many failed attempts. For your security this account is locked for ${Math.ceil(seconds / 60)} more minute(s).`;
 

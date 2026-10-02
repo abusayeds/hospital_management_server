@@ -151,9 +151,11 @@ ol.rx{list-style:none;padding:0;margin:4px 0 12px}
 </body></html>`;
 };
 
-export const prescriptionPdf = async (req: Request, visitId: string) => {
+/** `ownerCheck` (patient portal) replaces the staff EMR access check */
+export const prescriptionPdf = async (req: Request, visitId: string, ownerCheck?: (patientId: string) => void) => {
   const visit = await loadVisitView(visitId);
-  await assertEmrAccess(req, visit.patient.id);
+  if (ownerCheck) ownerCheck(visit.patient.id);
+  else await assertEmrAccess(req, visit.patient.id);
   if (visit.status !== "closed" || !visit.prescriptionNo)
     throw new AppError(409, "Close (sign) the visit before printing the prescription.", "CONFLICT");
 

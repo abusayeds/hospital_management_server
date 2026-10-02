@@ -98,8 +98,8 @@ ${tests}
 </body></html>`;
 };
 
-export const labReportPdf = async (req: Request, id: string) => {
-  const o = await loadOrderForReport(req, id);
+export const labReportPdf = async (req: Request, id: string, ownerCheck?: (patientId: string) => void) => {
+  const o = await loadOrderForReport(req, id, ownerCheck);
   const qrSvg = await QRCode.toString(verifyUrl(signDocumentCode(o.orderNo)), {
     type: "svg",
     margin: 0,

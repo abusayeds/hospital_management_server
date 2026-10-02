@@ -40,6 +40,13 @@ const senders: OtpSender[] = [];
 /** WhatsApp (Step F) registers itself here; tried before the log sender */
 export const registerOtpSender = (sender: OtpSender) => senders.unshift(sender);
 
+/** Send a code through the first sender that succeeds (WhatsApp when configured, else the dev log) */
+export const deliverCode = async (phone: string, code: string): Promise<"log" | "whatsapp" | null> => {
+  for (const sender of [...senders, logSender])
+    if (await sender.send(phone, code).catch(() => false)) return sender.name;
+  return null;
+};
+
 const hashCode = (conversationId: string, code: string) =>
   createHmac("sha256", env.JWT_SECRET_KEY).update(`otp:${conversationId}:${code}`).digest("hex");
 

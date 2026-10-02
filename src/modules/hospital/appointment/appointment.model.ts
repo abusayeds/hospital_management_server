@@ -15,7 +15,7 @@ export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number];
 // Statuses that occupy a slot. Kept in sync with the `holdsSlot` flag below.
 export const ACTIVE_STATUSES: readonly AppointmentStatus[] = ["booked", "checked_in", "in_consultation"];
 
-export const APPOINTMENT_SOURCES = ["reception", "chatbot", "whatsapp", "phone", "walk_in"] as const;
+export const APPOINTMENT_SOURCES = ["reception", "chatbot", "whatsapp", "phone", "walk_in", "portal"] as const;
 export type AppointmentSource = (typeof APPOINTMENT_SOURCES)[number];
 
 export const PRIORITIES = ["normal", "elderly", "emergency"] as const;

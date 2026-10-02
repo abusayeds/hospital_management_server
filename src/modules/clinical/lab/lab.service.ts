@@ -485,9 +485,11 @@ export const patientLabOrders = async (req: Request, patientId: string) => {
   return items.map((o) => toLabOrderView(o, req.user!));
 };
 
-export const loadOrderForReport = async (req: Request, id: string) => {
+/** `ownerCheck` (patient portal) replaces the staff access check: it throws unless the patient is the caller's */
+export const loadOrderForReport = async (req: Request, id: string, ownerCheck?: (patientId: string) => void) => {
   const o = await loadOrder(id);
-  await assertOrderAccess(req, o);
+  if (ownerCheck) ownerCheck(String(o.patient));
+  else await assertOrderAccess(req, o);
   if (!RELEASED.includes(o.status))
     throw new AppError(409, "The report can be printed after the results are verified.", "CONFLICT");
   await o.populate([...POPULATE, { path: "doctor", select: "title name degrees" }]);

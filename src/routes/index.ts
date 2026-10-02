@@ -20,6 +20,7 @@ import { AnalyticsRoutes } from "../modules/analytics/analytics.route";
 import { DailyReportRoutes } from "../modules/reports/report.route";
 import { SecurityRoutes } from "../modules/security/security.route";
 import { PharmacyRoutes } from "../modules/pharmacy/pharmacy.route";
+import { PortalAuthRoutes, PortalRoutes } from "../modules/portal/portal.route";
 import { EventRoutes } from "../events/events.route";
 import { VitalsRoutes } from "../modules/clinical/vitals/vitals.route";
 import { VisitRoutes } from "../modules/clinical/visits/visit.route";
@@ -69,6 +70,8 @@ const moduleRoutes: { path: string; route: express.Router }[] = [
   { path: "/analytics", route: AnalyticsRoutes },
   { path: "/security", route: SecurityRoutes },
   { path: "/pharmacy", route: PharmacyRoutes },
+  { path: "/portal/auth", route: PortalAuthRoutes },
+  { path: "/portal", route: PortalRoutes },
   { path: "/automation", route: AutomationRoutes },
   { path: "/assistant/web", route: WebChatRoutes },
   { path: "/knowledge", route: KnowledgeRoutes },
